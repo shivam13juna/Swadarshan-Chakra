@@ -28,6 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private enum FullScreenTransition { case entering, exiting }
     private var fullScreenTransition: FullScreenTransition?
     private var wantsMeditationVisible = false
+    /// Set when the window opens with "Open in full screen" ticked, and cleared once that entry
+    /// starts. Leaving full screen later (green button, ⌃⌘F) is never undone by a focus change.
+    private var fullScreenOnOpen = false
     private var quitting = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -72,6 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let smokeTest = CommandLine.arguments.contains("--smoke-test")
         model = SessionModel(defaults: smokeTest ? UserDefaults(suiteName: "com.swadarshan.chakra.smoke")! : .standard)
+        // One meditation window; keep tab-bar items out of the View menu.
+        NSWindow.allowsAutomaticWindowTabbing = false
         model.hideWindow = { [weak self] in self?.hideMeditation() }
         model.quitApplication = { [weak self] in self?.quitting = true; NSApp.terminate(nil) }
         configureStatusItem()
@@ -124,7 +129,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editItem.submenu = edit
         main.addItem(editItem)
+
+        // The standard full-screen toggle. AppKit retitles it "Exit Full Screen" while in full screen.
+        let viewItem = NSMenuItem()
+        let view = NSMenu(title: "View")
+        view.addItem(withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
+            .keyEquivalentModifierMask = [.control, .command]
+        viewItem.submenu = view
+        main.addItem(viewItem)
+
+        let windowItem = NSMenuItem()
+        let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowItem.submenu = windowMenu
+        main.addItem(windowItem)
         NSApp.mainMenu = main
+        NSApp.windowsMenu = windowMenu
     }
 
     @objc private func statusItemClicked() {
@@ -143,6 +164,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func showMeditation() {
         guard let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main else { return }
+        // Opening (rather than bringing forward a window already in use) applies the setting.
+        let opening = !wantsMeditationVisible
+        if opening { fullScreenOnOpen = model.opensInFullScreen }
         wantsMeditationVisible = true
         // Own activation and the full-screen Space while a window is open, just like
         // a normal Mac app. Return to a menu-bar-only utility after closing it.
@@ -151,26 +175,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let existing = self.window {
             window = existing
         } else {
+            // The standard window buttons stay available, as in any Mac app: the green one enters or
+            // leaves full screen. Content runs under the transparent title bar; see topInset(for:).
             window = MeditationWindow(contentRect: screen.visibleFrame,
-                                      styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+                                      styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                                       backing: .buffered, defer: false)
             window.title = "Swadarshan Chakra"
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.titlebarSeparatorStyle = .none
-            for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
-                window.standardWindowButton(button)?.isHidden = true
-            }
             window.isReleasedWhenClosed = false
-            window.hasShadow = false
             window.tabbingMode = .disallowed
             window.backgroundColor = NSColor(calibratedRed: 0.025, green: 0.04, blue: 0.09, alpha: 1)
             window.collectionBehavior = [.fullScreenPrimary, .fullScreenDisallowsTiling]
+            // The smallest layout the screens are designed and checked for.
+            window.contentMinSize = NSSize(width: 1024, height: 640)
             window.delegate = self
             self.window = window
         }
-        // AppKit owns the frame while entering or occupying its native full-screen Space.
-        if fullScreenTransition == nil && !window.styleMask.contains(.fullScreen) {
+        // AppKit owns the frame while entering or occupying its native full-screen Space. Full screen
+        // opens on the display under the pointer; an ordinary window keeps the size and place it was given.
+        if fullScreenOnOpen && fullScreenTransition == nil && !window.styleMask.contains(.fullScreen) {
             window.setFrame(screen.visibleFrame, display: true)
         }
         updateWindowContent()
@@ -185,6 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func hideMeditation() {
         wantsMeditationVisible = false
+        fullScreenOnOpen = false
         model?.pause(reason: "Paused when the window was closed.")
         guard let window, fullScreenTransition == nil else { return }
         if window.styleMask.contains(.fullScreen) {
@@ -198,7 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func updateWindowContent() {
         guard let window else { return }
-        let root = MeditationView(model: model, artwork: artwork, topInset: window.screen?.safeAreaInsets.top ?? 0)
+        let root = MeditationView(model: model, artwork: artwork, topInset: topInset(for: window))
         if let host = window.contentView as? NSHostingView<MeditationView> {
             host.rootView = root
         } else {
@@ -206,9 +232,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    /// The top space controls keep clear: the camera housing in full screen, or the title bar
+    /// with its window buttons in an ordinary window. The artwork itself still fills the window.
+    private func topInset(for window: NSWindow) -> CGFloat {
+        if window.styleMask.contains(.fullScreen) { return window.screen?.safeAreaInsets.top ?? 0 }
+        return max(0, window.frame.height - window.contentLayoutRect.height)
+    }
+
     private func enterFullScreenIfNeeded() {
-        guard wantsMeditationVisible, fullScreenTransition == nil, let window,
+        guard fullScreenOnOpen, wantsMeditationVisible, fullScreenTransition == nil, let window,
               window.isKeyWindow, !window.styleMask.contains(.fullScreen) else { return }
+        fullScreenOnOpen = false
         fullScreenTransition = .entering
         window.toggleFullScreen(nil)
     }
@@ -232,15 +266,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func windowWillExitFullScreen(_ notification: Notification) {
-        // A system full-screen exit also returns to the menu bar. A reopen requested
-        // during an already-started close is honored when the exit finishes.
-        if fullScreenTransition == nil { wantsMeditationVisible = false }
+        // Closing exits through hideMeditation, which has already let the window go. Any other exit
+        // (the green button, View ▸ Exit Full Screen, ⌃⌘F) keeps practicing in an ordinary window.
         fullScreenTransition = .exiting
-        model?.pause(reason: "Paused when full screen was closed.")
     }
 
     func windowDidExitFullScreen(_ notification: Notification) {
         fullScreenTransition = nil
+        // Also honors a reopen requested while a close was already leaving full screen.
         if wantsMeditationVisible { showMeditation() }
         else {
             window?.orderOut(nil)
@@ -249,11 +282,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        // Stay in an ordinary window rather than retrying.
         fullScreenTransition = nil
-        wantsMeditationVisible = false
-        model?.pause(reason: "Full screen could not open. Reopen meditation from the menu bar.")
-        window.orderOut(nil)
-        NSApp.setActivationPolicy(.accessory)
+        updateWindowContent()
     }
 
     func windowDidFailToExitFullScreen(_ window: NSWindow) {
@@ -355,7 +386,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func screensChanged() {
         guard let window, window.isVisible else { return }
         pauseForAbsence()
-        if fullScreenTransition == nil && !window.styleMask.contains(.fullScreen), let screen = window.screen ?? NSScreen.main {
+        // Keep an ordinary window's chosen size; only bring it back if its display went away.
+        if fullScreenTransition == nil && !window.styleMask.contains(.fullScreen) && window.screen == nil,
+           let screen = NSScreen.main {
             window.setFrame(screen.visibleFrame, display: true)
         }
         updateWindowContent()
@@ -377,17 +410,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             probe.pause()
             UserDefaults.standard.removePersistentDomain(forName: suiteName)
         }
+        func failure(_ code: Int, _ message: String) -> NSError {
+            NSError(domain: "TimerCheck", code: code, userInfo: [NSLocalizedDescriptionKey: message])
+        }
+        /// Polls while the main run loop keeps delivering the live timer; returns the seconds waited.
+        func wait(upTo limit: TimeInterval, until condition: () -> Bool) async throws -> TimeInterval {
+            let start = SessionModel.now
+            while !condition() {
+                if SessionModel.now - start > limit { break }
+                try await Task.sleep(nanoseconds: 20_000_000)
+            }
+            return SessionModel.now - start
+        }
         probe.cyclesText = "1"
         probe.minutesText = "0"
         probe.secondsText = "12"
         probe.begin()
-        try await Task.sleep(nanoseconds: 12_400_000_000)
-        guard probe.engine.phase == .running && probe.engine.stageIndex == 1 && probe.engine.completedCycles == 0 else {
-            throw NSError(domain: "TimerCheck", code: 1, userInfo: [NSLocalizedDescriptionKey: "Live timer did not advance exactly one stage after 12 seconds"])
+        guard probe.engine.isIntroducingCycle && probe.engine.currentCycle == 1 else {
+            throw failure(1, "Practice did not open with the Cycle 1 card")
+        }
+        print("PASS Practice opens with the Cycle 1 card")
+        let card = try await wait(upTo: 5) { !probe.engine.isIntroducingCycle }
+        guard card >= 2.9 && card < 3.6, probe.engine.phase == .running, probe.engine.stageIndex == 0,
+              probe.engine.remainingSeconds > 11.7 else {
+            throw failure(2, "The cycle card did not last three seconds before a full first step (\(card) s)")
+        }
+        print("PASS The cycle card lasts three seconds, then the first step starts with its full time")
+        let step = try await wait(upTo: 14) { probe.engine.stageIndex != 0 }
+        guard step >= 11.7 && step < 12.6, probe.engine.phase == .running, probe.engine.stageIndex == 1,
+              probe.engine.completedCycles == 0 else {
+            throw failure(3, "Live timer did not advance exactly one stage after 12 seconds (\(step) s)")
         }
         print("PASS Live timer advances exactly one stage after 12 seconds")
-        guard probe.engine.remainingSeconds > 11 && probe.engine.remainingSeconds <= 12 else {
-            throw NSError(domain: "TimerCheck", code: 2, userInfo: [NSLocalizedDescriptionKey: "Automatic advance did not start a fresh full countdown"])
+        guard probe.engine.remainingSeconds > 11.5 && probe.engine.remainingSeconds <= 12 else {
+            throw failure(4, "Automatic advance did not start a fresh full countdown")
         }
         print("PASS Automatic advance starts a fresh full countdown")
     }
@@ -410,6 +466,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
                 throw NSError(domain: "SmokeTest", code: 2, userInfo: [NSLocalizedDescriptionKey:
                     "Native full-screen entry timed out (active=\(NSApp.isActive), key=\(window?.isKeyWindow == true), fullScreen=\(window?.styleMask.contains(.fullScreen) == true))"])
+            }
+            @MainActor func awaitWindowed() async throws {
+                for _ in 0..<60 {
+                    if window?.isVisible == true, window?.styleMask.contains(.fullScreen) == false,
+                       fullScreenTransition == nil { return }
+                    try await settle(100)
+                }
+                throw NSError(domain: "SmokeTest", code: 4, userInfo: [NSLocalizedDescriptionKey: "Leaving full screen timed out"])
             }
             @MainActor func awaitHidden() async throws {
                 for _ in 0..<60 {
@@ -441,6 +505,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     try require(window.frame.width == screen.frame.width && window.frame.height >= screen.visibleFrame.height,
                                 "Full-screen window fills the display's usable area")
                 }
+                try require(window?.standardWindowButton(.zoomButton)?.isHidden == false,
+                            "The window keeps its standard full-screen button")
+                // The green button, View ▸ Exit Full Screen, and ⌃⌘F all send toggleFullScreen.
+                window?.toggleFullScreen(nil)
+                try await awaitWindowed()
+                try require(wantsMeditationVisible && window?.isKeyWindow == true,
+                            "Leaving full screen keeps meditation open in an ordinary window")
+                window?.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                try await settle(800)
+                try require(window?.styleMask.contains(.fullScreen) == false,
+                            "Focus changes do not force full screen back")
+                window?.toggleFullScreen(nil)
+                try await awaitFullScreen()
+                model.opensInFullScreen = false
+                hideMeditation()
+                try await awaitHidden()
+                showMeditation()
+                try await awaitWindowed()
+                try await settle(800)
+                try require(window?.styleMask.contains(.fullScreen) == false,
+                            "With Open in full screen unticked, meditation opens in a window")
+                model.opensInFullScreen = true
+                hideMeditation()
+                try await awaitHidden()
+                showMeditation()
+                try await awaitFullScreen()
+                try require(window?.styleMask.contains(.fullScreen) == true,
+                            "With Open in full screen ticked, meditation opens in full screen")
+                try await settle(400)
                 key(49, " ", posted: true)
                 try await settle()
                 try require(model.engine.phase == .ready, "Space does not start setup")
@@ -460,12 +554,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 key(36, "\r", posted: true)
                 try await settle()
                 try require(model.engine.phase == .running, "Return activates Begin")
+                try require(model.engine.isIntroducingCycle && model.engine.currentCycle == 1,
+                            "Practice opens with the Cycle 1 card")
                 try require(model.engine.configuration.secondsPerStage == 60 && model.engine.configuration.plannedSeconds == 300,
                             "One minute per step produces a five-minute cycle")
                 model.pause()
                 model.practiceAgain()
+                model.cyclesText = "3"
+                model.setTimingMode(.total)
+                try require(model.minutesText == "15" && model.secondsText == "00",
+                            "Switching to total time keeps the same practice")
+                model.minutesText = "10"
+                model.begin()
+                try require(model.engine.configuration.secondsPerStage == 40 && model.engine.configuration.plannedSeconds == 600,
+                            "Ten minutes for three cycles gives each step 40 seconds")
+                model.pause()
+                model.practiceAgain()
+                model.setTimingMode(.perStep)
+                try require(model.minutesText == "0" && model.secondsText == "40", "Switching back shows 40 seconds per step")
+                model.minutesText = "1"
+                model.secondsText = "00"
                 model.cyclesText = "2"
                 model.begin()
+                key(49, " ")
+                try await settle()
+                try require(!model.engine.isIntroducingCycle && model.engine.stageIndex == 0 && model.engine.remainingSeconds == 60,
+                            "Space on the cycle card begins the first step with its full time")
                 key(49, " ")
                 try await settle()
                 try require(model.engine.stageIndex == 1, "Native Space handler advances one stage")
@@ -521,12 +635,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 model.request(.restart)
                 try await settle()
                 model.confirm()
-                try require(model.engine.phase == .running && model.engine.stageIndex == 0,
-                            "Confirmed restart returns to Stage 1")
+                try require(model.engine.phase == .running && model.engine.stageIndex == 0 && model.engine.isIntroducingCycle,
+                            "Confirmed restart returns to the Cycle 1 card")
+                key(49, " ")
+                try await settle(70)
                 for index in 1...10 {
                     key(49, " ")
                     try await settle(70)
                     try require(model.engine.completedCycles == index / 5, "Manual step \(index) counts cycles correctly")
+                    if index == 5 {
+                        try require(model.engine.isIntroducingCycle && model.engine.currentCycle == 2,
+                                    "Completing a cycle shows the Cycle 2 card")
+                        key(49, " ")
+                        try await settle(70)
+                    }
                 }
                 try require(model.engine.phase == .complete, "Final Stage 5 completes the session")
                 try require(model.engine.activeSeconds < model.engine.configuration.plannedSeconds,

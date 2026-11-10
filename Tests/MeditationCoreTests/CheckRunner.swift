@@ -76,7 +76,16 @@ enum CoreCheckRunner {
             ("Duration formatting", suite.testDisplayFormattingRoundsCountdownUpAndPracticeDown),
             ("Legacy preference migration", suite.testLegacyPreferencesKeepTheSamePace),
             ("Per-step preference persistence", suite.testPerStepPreferencesRoundTripAndTakePrecedence),
-            ("Invalid preference fallback", suite.testMissingAndInvalidPreferencesUseSensibleDefaults)
+            ("Invalid preference fallback", suite.testMissingAndInvalidPreferencesUseSensibleDefaults),
+            ("Total time shared by every step", suite.testTotalTimeIsSharedEquallyByEveryStep),
+            ("Total time validation", suite.testTotalTimeValidation),
+            ("Switching timing mode", suite.testSwitchingTimingModeKeepsThePractice),
+            ("Total time session length", suite.testTotalTimeSessionFinishesAtTheEnteredTotal),
+            ("Cycle title cards", suite.testEveryCycleOpensWithATitleCardOutsidePracticeTime),
+            ("Space on a title card", suite.testSpaceOnTitleCardBeginsFirstStepOnly),
+            ("Title card boundary", suite.testTitleCardEndAndSpaceAtSameBoundaryIsOneTransition),
+            ("Pause on a title card", suite.testPausingOnTitleCardKeepsTheFullFirstStep),
+            ("Total time preferences", suite.testTotalTimePreferencesRoundTripAndFallBack)
         ]
         for (name, test) in cases {
             let previous = Check.failures

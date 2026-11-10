@@ -17,7 +17,10 @@ enum PreviewRenderer {
                     ("invalid", 1024, 640), ("fourth-form", 1440, 900), ("compact-fourth-form", 1024, 640),
                     ("first-form", 1440, 900), ("third-form", 1440, 900), ("fifth-form", 1440, 900),
                     ("wide-second-form", 2560, 1080), ("portrait-fourth-form", 900, 1440),
-                    ("long-duration", 1024, 640), ("zero-duration", 1024, 640)
+                    ("long-duration", 1024, 640), ("zero-duration", 1024, 640),
+                    ("cycle-intro", 1440, 900), ("next-cycle-intro", 1440, 900), ("compact-cycle-intro", 1024, 640),
+                    ("second-cycle-paused", 1440, 900), ("total-time", 1440, 900),
+                    ("compact-total-time", 1024, 640), ("total-time-too-short", 1024, 640)
                 ]
                 for (name, width, height) in scenarios {
                     let model = makeModel(name)
@@ -54,9 +57,26 @@ enum PreviewRenderer {
     }
 
     private static func makeModel(_ name: String) -> SessionModel {
-        var engine = SessionEngine()
+        let setupScreens = ["ready", "compact-ready", "invalid", "long-duration", "zero-duration",
+                            "total-time", "compact-total-time", "total-time-too-short"]
+        let defaults = UserDefaults(suiteName: "com.swadarshan.chakra.previews")!
+        if name.hasSuffix("cycle-intro") || name == "second-cycle-paused" {
+            var engine = SessionEngine()
+            engine.begin(try! SessionConfiguration(cycles: 3, minutesPerStep: 1), at: 0)
+            if name != "cycle-intro" && name != "compact-cycle-intro" {
+                for now in 1...6 { engine.nextStage(at: Double(now)) }   // Cycle 1, then the next card.
+            }
+            if name == "second-cycle-paused" {
+                engine.nextStage(at: 7)
+                engine.tick(at: 22)
+                engine.pause(at: 22)
+            }
+            return SessionModel(defaults: defaults, automaticTicks: false, initialEngine: engine)
+        }
+        // The remaining screens show steps directly, without the card that opens each cycle.
+        var engine = SessionEngine(introductionDuration: 0)
         let config = try! SessionConfiguration(cycles: name == "complete" ? 1 : 3, minutesPerStep: 1)
-        if !["ready", "compact-ready", "invalid", "long-duration", "zero-duration"].contains(name) {
+        if !setupScreens.contains(name) {
             engine.begin(config, at: 0)
             if name != "first-form" { engine.nextStage(at: 24) }
             engine.tick(at: 37)
@@ -74,11 +94,16 @@ enum PreviewRenderer {
                 for now in [70.0, 96, 132, 169] { engine.nextStage(at: now) }
             }
         }
-        let defaults = UserDefaults(suiteName: "com.swadarshan.chakra.previews")!
         let model = SessionModel(defaults: defaults, automaticTicks: false, initialEngine: engine)
         if name == "invalid" { model.cyclesText = "0"; model.minutesText = "1.5" }
         if name == "long-duration" { model.cyclesText = "107"; model.minutesText = "119"; model.secondsText = "59" }
         if name == "zero-duration" { model.minutesText = "0"; model.secondsText = "00" }
+        if name.contains("total-time") {
+            model.cyclesText = name == "compact-total-time" ? "7" : (name == "total-time-too-short" ? "108" : "3")
+            model.setTimingMode(.total)
+            model.minutesText = name == "total-time-too-short" ? "5" : "10"
+            model.secondsText = "00"
+        }
         return model
     }
 }

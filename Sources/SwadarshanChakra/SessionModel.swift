@@ -5,10 +5,17 @@ import MeditationCore
 @MainActor
 final class SessionModel: NSObject, ObservableObject {
     @Published var cyclesText: String
+    /// The minutes and seconds below are per step or for the whole practice, as this says.
+    @Published private(set) var timingMode: TimingMode
     @Published var minutesText: String
     @Published var secondsText: String
     @Published private(set) var engine = SessionEngine()
     @Published private(set) var pauseReason = "Your practice is paused."
+    /// How meditation opens: in its own full-screen Space (the default) or as an ordinary window.
+    /// The green window button and ⌃⌘F still switch at any time without changing this.
+    @Published var opensInFullScreen: Bool {
+        didSet { defaults.set(opensInFullScreen, forKey: "opensInFullScreen") }
+    }
 
     var hideWindow: () -> Void = {}
     var quitApplication: () -> Void = {}
@@ -20,35 +27,58 @@ final class SessionModel: NSObject, ObservableObject {
     init(defaults: UserDefaults = .standard, automaticTicks: Bool = true, initialEngine: SessionEngine = SessionEngine()) {
         self.defaults = defaults
         self.automaticTicks = automaticTicks
-        let saved = SessionPreferences.load(from: defaults)
+        let saved = initialEngine.phase == .ready ? SessionPreferences.load(from: defaults) : initialEngine.configuration
         cyclesText = String(saved.cycles)
-        minutesText = String(saved.minutesPerStep)
-        secondsText = String(format: "%02d", saved.secondsComponent)
+        timingMode = saved.timing
+        minutesText = String(saved.enteredMinutes)
+        secondsText = String(format: "%02d", saved.enteredSecondsComponent)
         engine = initialEngine
-        if initialEngine.phase != .ready {
-            cyclesText = String(initialEngine.configuration.cycles)
-            minutesText = String(initialEngine.configuration.minutesPerStep)
-            secondsText = String(format: "%02d", initialEngine.configuration.secondsComponent)
-        }
+        opensInFullScreen = defaults.object(forKey: "opensInFullScreen") as? Bool ?? true
         super.init()
     }
 
     static var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+    var cycles: Int? { SessionConfiguration.integer(cyclesText, in: SessionConfiguration.cycleRange) }
     var configuration: SessionConfiguration? {
-        guard let cycles = SessionConfiguration.integer(cyclesText, in: SessionConfiguration.cycleRange),
-              let duration = stepDuration else { return nil }
-        return try? SessionConfiguration(cycles: cycles, minutesPerStep: duration.minutesPerStep,
-                                         secondsPerStep: duration.secondsComponent)
-    }
-    var cyclesValid: Bool { SessionConfiguration.integer(cyclesText, in: SessionConfiguration.cycleRange) != nil }
-    var minutesValid: Bool { SessionConfiguration.integer(minutesText, in: SessionConfiguration.minuteRange) != nil }
-    var secondsValid: Bool { SessionConfiguration.integer(secondsText, in: SessionConfiguration.secondRange) != nil }
-    var durationValid: Bool { stepDuration != nil }
-
-    private var stepDuration: SessionConfiguration? {
-        guard let minutes = SessionConfiguration.integer(minutesText, in: SessionConfiguration.minuteRange),
+        guard let cycles,
+              let minutes = SessionConfiguration.integer(minutesText, in: SessionConfiguration.minuteRange(for: timingMode)),
               let seconds = SessionConfiguration.integer(secondsText, in: SessionConfiguration.secondRange) else { return nil }
-        return try? SessionConfiguration(cycles: 1, minutesPerStep: minutes, secondsPerStep: seconds)
+        return try? SessionConfiguration(cycles: cycles, timing: timingMode, minutes: minutes, seconds: seconds)
+    }
+    var cyclesValid: Bool { cycles != nil }
+    var secondsValid: Bool { SessionConfiguration.integer(secondsText, in: SessionConfiguration.secondRange) != nil }
+    var durationValid: Bool { durationProblem == nil }
+
+    /// Why the entered time cannot be used, or nil. An invalid cycle count is reported by its own field.
+    var durationProblem: String? {
+        let minuteRange = SessionConfiguration.minuteRange(for: timingMode)
+        guard let minutes = SessionConfiguration.integer(minutesText, in: minuteRange) else {
+            return "Enter whole minutes from 0 to \(minuteRange.upperBound)."
+        }
+        guard let seconds = SessionConfiguration.integer(secondsText, in: SessionConfiguration.secondRange) else {
+            return "Enter whole seconds from 0 to 59."
+        }
+        let entered = minutes * 60 + seconds
+        switch timingMode {
+        case .perStep:
+            return SessionConfiguration.durationRange.contains(entered) ? nil : "Choose 1 second to 120 minutes per step."
+        case .total:
+            if entered > SessionConfiguration.maximumTotalSeconds { return "Choose up to 600 minutes in total." }
+            guard let cycles else { return entered == 0 ? "Allow at least 1 second for each step." : nil }
+            let minimum = cycles * Stage.all.count
+            guard entered < minimum else { return nil }
+            return "For \(cycles) \(cycles == 1 ? "cycle" : "cycles"), allow at least \(TimeText.duration(Double(minimum))) (1 sec per step)."
+        }
+    }
+
+    /// Switching only changes how the time is entered: the fields are converted so the practice stays the same.
+    func setTimingMode(_ mode: TimingMode) {
+        guard mode != timingMode else { return }
+        if let converted = configuration?.expressed(as: mode) {
+            minutesText = String(converted.enteredMinutes)
+            secondsText = String(format: "%02d", converted.enteredSecondsComponent)
+        }
+        timingMode = mode
     }
 
     func begin() {
@@ -56,8 +86,10 @@ final class SessionModel: NSObject, ObservableObject {
         SessionPreferences.save(configuration, to: defaults)
         engine.begin(configuration, at: Self.now)
         updateTimer()
-        announce("Practice started. \(engine.currentStage.label)")
+        announce("Practice started. \(cycleTitle)")
     }
+
+    var cycleTitle: String { "Cycle \(engine.currentCycle) of \(engine.configuration.cycles)" }
 
     func nextStage(eventTime: TimeInterval? = nil, isRepeat: Bool = false) {
         let transitioned = engine.nextStage(at: Self.now, eventTime: eventTime, isRepeat: isRepeat,
@@ -130,7 +162,9 @@ final class SessionModel: NSObject, ObservableObject {
     }
 
     private func announceStage() {
-        announce(engine.phase == .complete ? "Meditation complete." : engine.currentStage.label)
+        if engine.phase == .complete { announce("Meditation complete.") }
+        else if engine.isIntroducingCycle { announce(cycleTitle) }
+        else { announce(engine.currentStage.label) }
     }
 
     private func announce(_ text: String) {

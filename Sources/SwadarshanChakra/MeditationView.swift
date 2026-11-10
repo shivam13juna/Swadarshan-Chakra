@@ -5,16 +5,24 @@ struct MeditationView: View {
     @ObservedObject var model: SessionModel
     let artwork: ArtworkLibrary
     var topInset: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
             Group {
                 if model.engine.phase == .ready || model.engine.phase == .complete {
-                    overview
+                    // Leaves at once; the cycle card then fades in over the dark window.
+                    overview.transition(.identity)
+                } else if model.engine.isIntroducingCycle {
+                    CycleIntroductionView(model: model, icon: artwork.brandIcon, topInset: topInset)
+                        .transition(.opacity)
                 } else {
-                    FullScreenStageView(model: model, artwork: artwork, topInset: topInset)
+                    FullScreenStageView(model: model, engine: model.engine, artwork: artwork, topInset: topInset)
+                        .transition(.opacity)
                 }
             }
+            // Cross-fade between the cycle card and the pictures.
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.5), value: model.engine.isIntroducingCycle)
             .disabled(model.engine.phase == .confirming)
             .allowsHitTesting(model.engine.phase != .confirming)
             .accessibilityHidden(model.engine.phase == .confirming)
@@ -49,6 +57,13 @@ struct MeditationView: View {
                             Shortcut(key: "Return", action: "Practice again")
                         }
                         Spacer()
+                        Toggle(isOn: $model.opensInFullScreen) {
+                            Text("Open in full screen").font(.system(size: 11)).foregroundColor(Palette.muted)
+                        }
+                        .toggleStyle(.checkbox).controlSize(.small).tint(Palette.gold)
+                        .help("Untick to open meditation in an ordinary window. The green window button or ⌃⌘F switches at any time.")
+                        .accessibilityIdentifier("open-in-full-screen")
+                        .padding(.trailing, 22)
                         Text("ON THIS MAC · ALWAYS OFFLINE")
                             .font(.system(size: 9, weight: .medium)).tracking(1.6).foregroundColor(Palette.muted)
                     }.frame(height: 25)

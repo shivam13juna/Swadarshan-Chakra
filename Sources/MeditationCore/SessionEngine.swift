@@ -6,11 +6,17 @@ public struct SessionEngine: Sendable {
     public enum Phase: Equatable, Sendable { case ready, running, paused, confirming, complete }
     public enum Confirmation: Equatable, Sendable { case restart, end, quit }
 
+    /// Every cycle opens with a short "Cycle N" title card. It is not practice time: the first
+    /// step's countdown starts only when the card ends, so no step is ever shortened by it.
+    public static let standardIntroduction: TimeInterval = 3
+
+    public let introductionDuration: TimeInterval
     public private(set) var phase: Phase = .ready
     public private(set) var configuration: SessionConfiguration = .standard
     public private(set) var stageIndex = 0
     public private(set) var completedCycles = 0
     public private(set) var remainingSeconds: TimeInterval = 60
+    public private(set) var introductionRemaining: TimeInterval = 0
     public private(set) var activeSeconds: TimeInterval = 0
     public private(set) var pendingConfirmation: Confirmation?
     public private(set) var transitionCount = 0
@@ -23,16 +29,21 @@ public struct SessionEngine: Sendable {
     /// Coalesce a physical key press and a timer expiration delivered at the same boundary.
     public static let boundaryTolerance: TimeInterval = 0.15
 
-    public init() {}
+    public init(introductionDuration: TimeInterval = SessionEngine.standardIntroduction) {
+        self.introductionDuration = max(0, introductionDuration)
+    }
     public var currentStage: Stage { Stage.all[stageIndex] }
+    public var currentCycle: Int { min(completedCycles + 1, configuration.cycles) }
+    public var isIntroducingCycle: Bool { phase == .running && introductionRemaining > 0 }
     public var progress: Double {
         min(1, max(0, 1 - remainingSeconds / configuration.secondsPerStage))
     }
 
     public mutating func begin(_ configuration: SessionConfiguration, at now: TimeInterval) {
-        self = SessionEngine()
+        self = SessionEngine(introductionDuration: introductionDuration)
         self.configuration = configuration
         remainingSeconds = configuration.secondsPerStage
+        introductionRemaining = introductionDuration
         lastSample = now
         stageStartedAt = now
         phase = .running
@@ -46,6 +57,14 @@ public struct SessionEngine: Sendable {
         if let maximumGap, now - lastSample > maximumGap {
             pauseAtLastSample()
             return false
+        }
+        if introductionRemaining > 0 {
+            introductionRemaining = max(0, introductionRemaining - max(0, now - lastSample))
+            lastSample = max(lastSample, now)
+            guard introductionRemaining == 0 else { return false }
+            // The card has ended; the cycle's first step starts now with its full time.
+            restartClock(at: now, automatic: true)
+            return true
         }
         accrue(until: now)
         if remainingSeconds <= 0 {
@@ -71,6 +90,12 @@ public struct SessionEngine: Sendable {
         // If expiration and this key press coincide, expiration consumes this single transition.
         if tick(at: now, maximumGap: maximumGap) { return true }
         guard phase == .running else { return false }
+        if introductionRemaining > 0 {
+            // Space on a title card begins that cycle's first step immediately, with its full time.
+            introductionRemaining = 0
+            restartClock(at: now, automatic: false)
+            return true
+        }
         advance(at: now, automatic: false)
         return true
     }
@@ -81,14 +106,22 @@ public struct SessionEngine: Sendable {
             return
         }
         guard phase == .running else { return }
-        // Pausing never traverses a stage, even if its deadline has just passed.
-        accrue(until: now)
+        if introductionRemaining > 0 {
+            // Pausing on a title card begins its cycle; the first step waits with its full time.
+            introductionRemaining = 0
+        } else {
+            // Pausing never traverses a stage, even if its deadline has just passed.
+            accrue(until: now)
+        }
         phase = .paused
     }
 
     public mutating func pauseAtLastSample() {
         if phase == .confirming { resumeOnCancel = false }
-        if phase == .running { phase = .paused }
+        if phase == .running {
+            introductionRemaining = 0
+            phase = .paused
+        }
     }
 
     public mutating func resume(at now: TimeInterval) {
@@ -129,7 +162,7 @@ public struct SessionEngine: Sendable {
         return action
     }
 
-    public mutating func reset() { self = SessionEngine() }
+    public mutating func reset() { self = SessionEngine(introductionDuration: introductionDuration) }
 
     private mutating func accrue(until now: TimeInterval) {
         let delta = max(0, now - lastSample)
@@ -149,10 +182,15 @@ public struct SessionEngine: Sendable {
                 return
             }
             stageIndex = 0
+            introductionRemaining = introductionDuration
         } else {
             stageIndex += 1
         }
         remainingSeconds = configuration.secondsPerStage
+        restartClock(at: now, automatic: automatic)
+    }
+
+    private mutating func restartClock(at now: TimeInterval, automatic: Bool) {
         lastSample = now
         stageStartedAt = now
         lastAutomaticTransition = automatic ? now : nil

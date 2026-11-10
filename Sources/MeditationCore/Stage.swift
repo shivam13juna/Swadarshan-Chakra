@@ -18,8 +18,8 @@ public struct Stage: Identifiable, Equatable, Sendable {
               transliteration: "Vishwa Maharajan satyug me", fileName: "pic_2.jpg"),
         Stage(id: 3, title: "पूज्य स्वरूप", context: "द्वापर युग में",
               transliteration: "Pujya Swaroop dwapar yug me", fileName: "pic_3.png"),
-        Stage(id: 4, title: "परम पवित्र ब्राह्मण", context: "कलियुग में",
-              transliteration: "Param Pavitra Brahmin Kalyug me", fileName: "pic_4.png"),
+        Stage(id: 4, title: "परम पवित्र ब्राह्मण", context: "संगम युग में",
+              transliteration: "Param Pavitra Brahmin Sangam Yug me", fileName: "pic_4.png"),
         Stage(id: 5, title: "फरिश्ता स्वरूप", context: "",
               transliteration: "Farishta swaroop", fileName: "pic_5.png")
     ]

@@ -1,99 +1,188 @@
-# Swadarshan Chakra
+<p align="center">
+  <img src="docs/images/icon.png" width="120" alt="The gold Swadarshan Chakra">
+</p>
 
-A native macOS menu bar meditation app, implemented from [prd_v2.md](prd_v2.md) and the product updates recorded at its top. During each step, its supplied picture fills the entire display, scaled proportionally and cropped to fit. A small Hindi title, timer, and controls sit over the picture's edges. The five-picture circle remains the overview before and after practice.
+<h1 align="center">Swadarshan Chakra</h1>
 
-## Open the app
+<p align="center">
+  <b>स्वदर्शन चक्र</b> · a calm, full-screen companion for the Swadarshan Chakra meditation on your Mac
+</p>
 
-The built application is at **`dist/Swadarshan Chakra.app`**. Double-click it in Finder, or run:
+<p align="center">
+  <a href="https://github.com/shivam13juna/Swadarshan-Chakra/releases/latest"><b>Download the latest release</b></a>
+  <br>
+  <sub>macOS 13 Ventura or later · Apple Silicon · Free · Works entirely offline</sub>
+</p>
+
+<br>
+
+![The setup screen: the five forms arranged in a circle, with your practice settings on the right](docs/screenshots/setup.jpg)
+
+## What it does
+
+Swadarshan Chakra guides you through five consecutive forms of spiritual self-awareness, one at a time. Each form's picture fills your screen while you contemplate it. When its time is up, the next form begins, and after the fifth, the circle starts again. One pass through all five forms is a **cycle**.
+
+You choose how many cycles to practice and how much time to give them. The app keeps time, so you don't have to.
+
+### The five steps
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/form-1.jpg" width="360" alt="Step 1 during practice: बीज रूप — परमधाम में"><br>
+      <b>1 · बीज रूप</b> — परमधाम में<br>
+      <sub>Beej roop, Paramdham me</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/form-2.jpg" width="360" alt="Step 2 during practice: विश्व महाराजन — सतयुग में"><br>
+      <b>2 · विश्व महाराजन</b> — सतयुग में<br>
+      <sub>Vishwa Maharajan, Satyug me</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/form-3.jpg" width="360" alt="Step 3 during practice: पूज्य स्वरूप — द्वापर युग में"><br>
+      <b>3 · पूज्य स्वरूप</b> — द्वापर युग में<br>
+      <sub>Pujya Swaroop, Dwapar Yug me</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/form-4.jpg" width="360" alt="Step 4 during practice: परम पवित्र ब्राह्मण — संगम युग में"><br>
+      <b>4 · परम पवित्र ब्राह्मण</b> — संगम युग में<br>
+      <sub>Param Pavitra Brahmin, Sangam Yug me</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <img src="docs/screenshots/form-5.jpg" width="360" alt="Step 5 during practice: फरिश्ता स्वरूप"><br>
+      <b>5 · फरिश्ता स्वरूप</b><br>
+      <sub>Farishta Swaroop</sub>
+    </td>
+  </tr>
+</table>
+
+## Install
+
+1. Download **Swadarshan-Chakra-…-macOS-arm64.zip** from the [latest release](https://github.com/shivam13juna/Swadarshan-Chakra/releases/latest).
+2. Open the zip and drag **Swadarshan Chakra** into your **Applications** folder.
+3. Open it. The first time, macOS says it can't verify the app, because it isn't notarized by Apple. Click **Done**, open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**. You only need to do this once.
+
+Swadarshan Chakra lives in your **menu bar** as a small gold chakra. Click it to open the meditation; right-click it to quit.
+
+> [!NOTE]
+> On an Intel Mac, build the app from source. See [For developers](#for-developers).
+
+## Your practice, step by step
+
+### 1. Set it up
+
+<img src="docs/screenshots/total-time.jpg" width="320" align="right" alt="The practice panel set to 10 minutes of total time for 3 cycles, which gives 40 seconds per step">
+
+**Cycles:** anywhere from 1 to 108.
+
+**Time:** click the drop-down to choose how you'd like to set it.
+
+- **Time per step** gives every form the time you enter.<br>*1 minute per step → 5 minutes per cycle.*
+- **Total time** is the time you have for the whole practice, shared equally by every step.<br>*10 minutes for 3 cycles → 40 seconds per step.*
+
+The panel shows what your choice works out to. Press **Begin meditation** (or <kbd>Return</kbd>). Your settings are remembered for next time.
+
+<br clear="right">
+
+### 2. Meditate
+
+Each step fills your screen, as in [the five steps](#the-five-steps) above.
+
+- The current **cycle** and **step** are in the top-left corner. The form's name and the time remaining are at the bottom.
+- When a step's time is up, the next one begins by itself. Ready sooner? Press <kbd>Space</kbd>.
+- <kbd>Esc</kbd> pauses. From there you can resume, restart, or end the practice.
+- If you switch to another app, close the window, or your Mac goes to sleep, the practice pauses and waits for you. Nothing moves on while you're away.
+
+![The practice paused in the second cycle, with Resume, Restart, and End in the bottom-right corner](docs/screenshots/paused.jpg)
+
+### 3. A moment between cycles
+
+![The card that opens the second cycle: the gold chakra above the words "Cycle 2"](docs/screenshots/cycle-card.jpg)
+
+Each cycle opens with a short card: *Cycle 1*, *Cycle 2*, and so on. After three seconds the first step begins on its own. The card isn't counted as practice time, and every step still gets its full time.
+
+### 4. Finish
+
+![The completion screen, showing the time practiced and the time planned](docs/screenshots/complete.jpg)
+
+When the last cycle ends, you'll see how many cycles you completed and how long you actually practiced. Press <kbd>Return</kbd> to practice again.
+
+## Full screen or a window
+
+Meditation opens in full screen, so nothing else competes for your attention. If you'd rather use an ordinary window, untick **Open in full screen** at the bottom of the setup screen.
+
+You can also switch at any time, as in any Mac app: click the green window button (in full screen, move your pointer to the top of the screen to reveal it), choose **View ▸ Enter Full Screen**, or press <kbd>⌃</kbd> <kbd>⌘</kbd> <kbd>F</kbd>.
+
+## Keyboard shortcuts
+
+| Keys | Action |
+|---|---|
+| <kbd>Return</kbd> | Begin · Resume · Practice again |
+| <kbd>Space</kbd> | Next step, or start a cycle right away from its card |
+| <kbd>Esc</kbd> | Pause |
+| <kbd>⌘</kbd> <kbd>R</kbd> / <kbd>⌘</kbd> <kbd>E</kbd> | Restart / End, while paused (asks first) |
+| <kbd>⌘</kbd> <kbd>Return</kbd> | Confirm restart, end, or quit |
+| <kbd>⌃</kbd> <kbd>⌘</kbd> <kbd>F</kbd> | Enter or leave full screen |
+| <kbd>⌘</kbd> <kbd>M</kbd> | Minimize, in a window |
+| <kbd>⌘</kbd> <kbd>W</kbd> | Close to the menu bar; your practice pauses and waits |
+| <kbd>⌘</kbd> <kbd>Q</kbd> | Quit (asks first if a practice is under way) |
+
+Holding <kbd>Space</kbd> down never skips more than one step.
+
+## Privacy
+
+Everything happens on your Mac. There are no accounts, no tracking, and no internet connection: the app never goes online. Your settings are stored only on this Mac.
+
+## For developers
+
+<details>
+<summary><b>Build, check, and release</b></summary>
+<br>
+
+Requires macOS 13 or later and Swift 5.9 or later. Apple's Command Line Tools are enough; there are no third-party dependencies.
 
 ```sh
-open "dist/Swadarshan Chakra.app"
-```
-
-The first launch opens setup in native macOS full-screen mode, in its own Space. The menu bar and Dock hide automatically, as they do in other full-screen Mac apps. Later, click the supplied gold chakra icon in the menu bar to reopen it. Close the window with its × button or **⌘W**; the app exits the full-screen Space, stays in the menu bar, and preserves an ongoing practice in a paused state. Right-click the menu bar icon to quit.
-
-Choose **1–108 cycles** and **Time per step**, entered as minutes and seconds. Every one of the five forms receives that full duration. The app calculates the cycle and session totals automatically: **1 minute per step → 5 minutes per cycle**; **3 cycles at 2 minutes per step → 30 minutes planned**. A step can last from 1 second to 120 minutes. Your valid selections are remembered when you begin.
-
-Saved settings from the earlier version retain their original pace. For example, an old five-minute cycle becomes `1 min : 00 sec` per step; an old seven-minute cycle becomes `1 min : 24 sec` per step.
-
-| Control | Action |
-| --- | --- |
-| Return in setup | Begin meditation |
-| Space while running | Move exactly one stage forward, with a fresh full countdown |
-| Esc while running | Pause and show session controls |
-| Return while paused | Resume |
-| ⌘R while paused | Request a restart |
-| ⌘E while paused | Request an end |
-| Esc in a confirmation | Keep the current practice |
-| ⌘Return in a confirmation | Confirm restart/end/quit |
-| ⌘W / ⌘H | Close or hide, preserving a paused session |
-| ⌘Q | Quit; an unfinished practice requires confirmation |
-| Return after completion | Return to setup for another practice |
-
-Holding Space does not repeatedly advance. Space is inactive in setup, pause, confirmation, and completion. Switching apps, losing the window's focus, sleeping, or locking pauses progress. Resume is always deliberate. Completion shows completed cycles, actual active time, and the originally planned time.
-
-## Build
-
-Requires **macOS 13 or newer** and **Swift 5.9 or newer**. Apple Command Line Tools are sufficient; there are no third-party dependencies, package downloads, web views, or servers.
-
-```sh
+# Build the app into dist/ and open it
 ./scripts/build-app.sh --launch
-```
 
-This builds a release executable for the current Mac's architecture, creates the `.app` in `dist`, embeds all five pictures, packages the supplied `icon.png` as the app icon, and applies a local ad-hoc signature. The Finder/Dock icon places the chakra at 95% of a rounded tile's width, leaving a narrow neutral rim instead of macOS adding a wider frame around the circular artwork. The original transparent PNG is used in the app header, confirmation dialogs, and menu bar; its bundled copy is verified against the original. The app bundle can be moved to Applications. For a debug build, add `--debug`. The build is signed in a staging directory before replacing the previous bundle; a copy of the previous build stays in the hidden `dist/.app-build.*` directory.
-
-This is a local build. Developer ID signing and Apple notarization for public distribution are separate release steps.
-
-## Verify
-
-```sh
+# Verify the artwork, run the core checks, and compile
 ./scripts/check.sh
 ```
 
-This verifies the original artwork and supplied icon, runs **28 deterministic core checks / 367 assertions**, and compiles the app. The standalone check runner avoids an XCTest dependency, so full Xcode is not needed. Its scenarios cover per-step timing and automatic totals, saved-setting migration, complete automatic sessions, manual steps, Stage 5 boundaries, key repeat, both orderings of timer/key collisions, stale keyboard events, pause/resume, confirmations, absence, validation, and actual practice time.
+`build-app.sh` makes a release build for this Mac's architecture, embeds the five pictures and the icon, and signs the app locally (ad hoc). Add `--debug` for a debug build.
 
-The app also provides development checks:
+The app also has built-in checks:
 
 ```sh
-# Verify that a packaged app can decode its own embedded pictures.
-"dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra" --verify-resources
-
-# Verify the live 12-second per-step timer without opening a window.
-"dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra" --verify-timer
-
-# Exercise the actual full-screen window, keyboard event loop, live 12-second timer,
-# menu bar/Dock hiding, reopening, lifecycle handlers, and completion. Takes about 30 seconds.
-# Requires an unlocked Mac. This opens a test window and uses isolated preferences. The long timer
-# probe runs independently so switching apps does not interrupt that probe.
-"dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra" --smoke-test
-
-# Capture native SwiftUI/AppKit screens, including smaller layouts and validation.
-"dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra" --render-previews .artifacts/native-fullscreen-previews
+APP="dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra"
+"$APP" --verify-resources            # the packaged app decodes all five pictures
+"$APP" --verify-timer                # live 3-second cycle card and 12-second step; about 16 s, no window
+"$APP" --smoke-test                  # drives the real full-screen window; about 45 s, takes over the screen
+"$APP" --render-previews <folder>    # renders every screen to PNG, as used for the screenshots here
 ```
 
-## Artwork and wording
+**Releasing.** Set `CFBundleShortVersionString` in `packaging/Info.plist`, commit, and push a matching tag:
 
-| Logical ID | Original file | Stage |
-| --- | --- | --- |
-| `stage_01` | `5_pictures/pic_1.png` | बीज रूप — परमधाम में |
-| `stage_02` | `5_pictures/pic_2.jpg` | विश्व महाराजन — सतयुग में |
-| `stage_03` | `5_pictures/pic_3.png` | पूज्य स्वरूप — द्वापर युग में |
-| `stage_04` | `5_pictures/pic_4.png` | परम पवित्र ब्राह्मण — कलियुग में |
-| `stage_05` | `5_pictures/pic_5.png` | फरिश्ता स्वरूप |
+```sh
+git tag v1.2.0 && git push origin v1.2.0
+```
 
-The numbered files are mapped explicitly in `Sources/MeditationCore/Stage.swift`. The Hindi names preserve the PRD's spelling. Copies in `Sources/SwadarshanChakra/Resources/Artwork` are byte-identical to the originals; packaging fails if a file is missing, added, or changed. During running and paused steps, the active image uses centered aspect fill: it covers the display without stretching, with excess edges cropped as needed for the screen's proportions. Overview thumbnails use aspect fit. Images are decoded once at up to 4096 pixels without modifying the bundled originals. The app uses macOS's Kohinoor Devanagari font and respects Reduce Motion for image transitions.
+The [release workflow](.github/workflows/release.yml) checks that the tag matches the version, runs the checks, builds and signs the app, verifies it, and publishes `Swadarshan-Chakra-<version>-macOS-arm64.zip` with a SHA-256 checksum. A tag such as `v1.2.0-beta.1` becomes a pre-release. Removing the first-launch prompt would require Apple notarization with a Developer ID.
 
-## Implementation
+**Project layout**
 
-- `Sources/MeditationCore`: validated configuration, immutable stage catalog, and a deterministic session state machine.
-- `Sources/SwadarshanChakra/SessionModel.swift`: the main-actor UI adapter, monotonic uptime clock, local preferences, and a timer that exists only while running.
-- `Sources/SwadarshanChakra/AppMain.swift`: the AppKit status item, current-display borderless window, native keyboard handling, and lifecycle observations.
-- `Sources/SwadarshanChakra/FullScreenStageView.swift`: the active image filling the display, with small controls and local edge shading for readability.
-- `Sources/SwadarshanChakra/*View.swift`: native SwiftUI layout, active artwork, progress, and confirmation states.
-- `Tests/MeditationCoreTests`: executable core checks with no external test framework.
+| Path | Contents |
+|---|---|
+| `Sources/MeditationCore` | Settings, the five forms, and the session state machine: timing, cycles, pause, and Space |
+| `Sources/SwadarshanChakra` | The macOS app: the menu bar item, the window and full screen, and the SwiftUI screens |
+| `Tests/MeditationCoreTests` | 37 deterministic checks that run without Xcode |
+| `5_pictures` | The five original pictures. The bundled copies must match them byte for byte, and `Stage.swift` maps each to its form |
+| `scripts` | Build, check, icon, and artwork-verification scripts |
 
-The window enters a native full-screen Space on the selected display using AppKit's full-screen transition. AppKit owns the menu bar and Dock presentation for that Space, and the controls respect the display's top safe area. The app uses regular activation while its window is open and returns to accessory activation when closed, so it remains a menu bar utility while idle. Closing and reopening wait for the native transition to finish, preserving the paused session. Session progress is kept in memory until explicitly ended, restarted, or the utility quits; it is not a persistent session history.
+[VERIFICATION.md](VERIFICATION.md) records what has been verified and how; [prd_v2.md](prd_v2.md) is the product specification.
 
-Every progression event goes through one serialized transition function. A 150 ms window coalesces Space with automatic expiry at the same boundary, while deliberate successive manual presses remain possible. A stage always receives its full allocation on entry. If the event loop goes unobserved for more than 2.5 seconds, the practice pauses at its last observed time instead of progressing unattended. Normal small callback delays are measured with the monotonic clock; a stage's active-time contribution is capped at its allocation.
-
-Native framework references: Apple's [NSStatusItem](https://developer.apple.com/documentation/appkit/nsstatusitem), [full-screen windows](https://developer.apple.com/documentation/appkit/nswindow/collectionbehavior-swift.struct/fullscreenprimary), [full-screen presentation options](https://developer.apple.com/documentation/appkit/nswindowdelegate/window(_:willusefullscreenpresentationoptions:)), and [NSWorkspace](https://developer.apple.com/documentation/appkit/nsworkspace).
+</details>

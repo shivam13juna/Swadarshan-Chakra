@@ -4,6 +4,9 @@ import MeditationCore
 /// The artwork occupies the complete window. Only small controls sit over its edges.
 struct FullScreenStageView: View {
     @ObservedObject var model: SessionModel
+    /// Drawn from this value rather than `model.engine`: SwiftUI may still re-evaluate a view while it
+    /// fades out, and the last step must not switch to the next cycle's first picture as it leaves.
+    let engine: SessionEngine
     let artwork: ArtworkLibrary
     let topInset: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -14,15 +17,15 @@ struct FullScreenStageView: View {
             let compact = size.width < 1100 || size.height < 720
             let padding: CGFloat = compact ? 24 : 38
             ZStack {
-                Image(nsImage: artwork.image(for: model.engine.currentStage))
+                Image(nsImage: artwork.image(for: engine.currentStage))
                     .resizable().interpolation(.high)
                     .scaledToFill()
                     .frame(width: size.width, height: size.height, alignment: .center)
                     .clipped()
-                    .id(model.engine.currentStage.id)
+                    .id(engine.currentStage.id)
                     .transition(.opacity)
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: model.engine.currentStage.id)
-                    .accessibilityLabel(model.engine.currentStage.label)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: engine.currentStage.id)
+                    .accessibilityLabel(engine.currentStage.label)
                     .accessibilityIdentifier("active-artwork")
 
                 // Local edge shading keeps controls legible on all five pictures without
@@ -61,18 +64,21 @@ struct FullScreenStageView: View {
     }
 
     private var topControls: some View {
-        HStack {
-            HStack(spacing: 13) {
-                Text("STEP \(String(format: "%02d", model.engine.stageIndex + 1)) / 05")
-                    .font(.system(size: 10, weight: .medium)).tracking(1.6)
-                if model.engine.phase != .running {
-                    Label("Paused", systemImage: "pause.fill").font(.system(size: 11, weight: .medium))
+        HStack(alignment: .top) {
+            // Both boxes share the wider one's width, so the pair reads as one aligned stack.
+            VStack(alignment: .leading, spacing: 8) {
+                CycleCounter(engine: engine)
+                CounterCapsule {
+                    HStack(spacing: 13) {
+                        Text("STEP \(String(format: "%02d", engine.stageIndex + 1)) / 05")
+                        if engine.phase != .running {
+                            Label("Paused", systemImage: "pause.fill").font(.system(size: 11, weight: .medium))
+                        }
+                    }
                 }
+                .accessibilityLabel("Step \(engine.stageIndex + 1) of 5\(engine.phase == .running ? "" : ", paused")")
             }
-            .foregroundColor(.white.opacity(0.92))
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(.black.opacity(0.26), in: Capsule())
-            .accessibilityLabel("Step \(model.engine.stageIndex + 1) of 5\(model.engine.phase == .running ? "" : ", paused")")
+            .fixedSize(horizontal: true, vertical: false)
             Spacer()
             Button(action: model.hideWindow) {
                 Image(systemName: "xmark").font(.system(size: 13, weight: .medium))
@@ -87,22 +93,22 @@ struct FullScreenStageView: View {
 
     private func stageInformation(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(model.engine.currentStage.title)
+            Text(engine.currentStage.title)
                 .font(Palette.hindi(compact ? 29 : 38))
                 .foregroundColor(.white)
                 .lineLimit(1).minimumScaleFactor(0.75)
                 .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
-            if !model.engine.currentStage.context.isEmpty {
-                Text(model.engine.currentStage.context)
+            if !engine.currentStage.context.isEmpty {
+                Text(engine.currentStage.context)
                     .font(Palette.hindi(compact ? 16 : 19)).foregroundColor(.white.opacity(0.88))
             }
             HStack(spacing: 12) {
-                Text(TimeText.countdown(model.engine.remainingSeconds))
+                Text(TimeText.countdown(engine.remainingSeconds))
                     .font(.system(size: 20, weight: .regular, design: .rounded)).monospacedDigit()
-                    .accessibilityLabel("\(TimeText.countdown(model.engine.remainingSeconds)) remaining")
+                    .accessibilityLabel("\(TimeText.countdown(engine.remainingSeconds)) remaining")
                     .accessibilityIdentifier("remaining-time")
                 Rectangle().fill(.white.opacity(0.35)).frame(width: 1, height: 14).accessibilityHidden(true)
-                Text("\(model.engine.completedCycles) / \(model.engine.configuration.cycles) cycles completed")
+                Text("\(engine.completedCycles) / \(engine.configuration.cycles) cycles completed")
                     .font(.system(size: 12)).monospacedDigit()
             }
             .foregroundColor(.white.opacity(0.9)).padding(.top, 5)
@@ -111,16 +117,17 @@ struct FullScreenStageView: View {
 
     private var playbackControls: some View {
         VStack(alignment: .trailing, spacing: 11) {
-            if model.engine.phase == .running {
+            if engine.phase == .running {
                 HStack(spacing: 9) {
                     Button { model.pause() } label: { Label("Pause", systemImage: "pause") }
                         .buttonStyle(ArtworkButtonStyle()).accessibilityIdentifier("pause-meditation")
                     Button { model.nextStage() } label: { Label("Next step", systemImage: "arrow.right") }
                         .buttonStyle(ArtworkButtonStyle()).accessibilityIdentifier("next-stage")
                 }
+                // Same order as the buttons above: Pause, then Next step.
                 HStack(spacing: 17) {
-                    Shortcut(key: "Space", action: "Next step", color: .white.opacity(0.85))
                     Shortcut(key: "Esc", action: "Pause", color: .white.opacity(0.85))
+                    Shortcut(key: "Space", action: "Next step", color: .white.opacity(0.85))
                 }
             } else {
                 HStack(spacing: 9) {
@@ -141,7 +148,35 @@ struct FullScreenStageView: View {
     }
 }
 
-private struct ArtworkButtonStyle: ButtonStyle {
+/// A small top-left capsule. Inside a fixed-size stack, capsules share the widest one's width.
+struct CounterCapsule<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .font(.system(size: 10, weight: .medium)).tracking(1.6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundColor(.white.opacity(0.92))
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(.black.opacity(0.26), in: Capsule())
+            .accessibilityElement(children: .ignore)
+    }
+}
+
+/// "CYCLE 02 / 03", in the same place on the cycle card and on every step.
+struct CycleCounter: View {
+    let engine: SessionEngine
+
+    var body: some View {
+        CounterCapsule {
+            Text("CYCLE \(String(format: "%02d", engine.currentCycle)) / \(String(format: "%02d", engine.configuration.cycles))")
+        }
+        .accessibilityLabel("Cycle \(engine.currentCycle) of \(engine.configuration.cycles)")
+        .accessibilityIdentifier("cycle-counter")
+    }
+}
+
+struct ArtworkButtonStyle: ButtonStyle {
     var prominent = false
     @Environment(\.isFocused) private var focused
 

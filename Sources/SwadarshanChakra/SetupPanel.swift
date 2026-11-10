@@ -1,6 +1,10 @@
 import SwiftUI
 import MeditationCore
 
+extension TimingMode {
+    var title: String { self == .perStep ? "Time per step" : "Total time" }
+}
+
 struct SetupPanel: View {
     @ObservedObject var model: SessionModel
     let compact: Bool
@@ -22,18 +26,12 @@ struct SetupPanel: View {
                 NumberInput(title: "Cycles", hint: "1–108 rounds", value: $model.cyclesText,
                             range: SessionConfiguration.cycleRange, fallback: 1, valid: model.cyclesValid,
                             error: "Enter a whole number from 1 to 108.", identifier: "cycles-input")
-                StepDurationInput(model: model)
+                DurationInput(model: model)
             }
 
-            HStack(alignment: .top, spacing: 0) {
-                derivedValue("PER CYCLE", value: model.configuration.map { TimeText.duration($0.secondsPerCycle) } ?? "—")
-                Spacer(minLength: 8)
-                Rectangle().fill(Palette.ivory.opacity(0.12)).frame(width: 1, height: 38)
-                Spacer(minLength: 18)
-                derivedValue("PLANNED TIME", value: model.configuration.map { TimeText.duration($0.plannedSeconds) } ?? "—")
-            }
-            .padding(14)
-            .background(Palette.background.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
+            summary
+                .padding(14)
+                .background(Palette.background.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
 
             VStack(spacing: 12) {
                 Button(action: model.begin) {
@@ -49,7 +47,9 @@ struct SetupPanel: View {
                 .disabled(model.configuration == nil)
                 .accessibilityIdentifier("begin-meditation")
 
-                Text("Each step gets this full time. Space moves to the next step early.")
+                Text(model.timingMode == .perStep
+                     ? "Each step gets this full time. Space moves to the next step early."
+                     : "This time is shared equally by every step. Space moves to the next step early.")
                     .font(.system(size: 11)).foregroundColor(Palette.muted)
                     .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             }
@@ -63,6 +63,23 @@ struct SetupPanel: View {
         }
     }
 
+    /// The two amounts the practitioner did not enter, calculated from the one they did.
+    private var summary: some View {
+        let configuration = model.configuration
+        let values: [(String, String?)] = model.timingMode == .perStep
+            ? [("PER CYCLE", configuration.map { TimeText.duration($0.secondsPerCycle) }),
+               ("PLANNED TIME", configuration.map { TimeText.duration($0.plannedSeconds) })]
+            : [("PER STEP", configuration.map { TimeText.approximateDuration($0.secondsPerStage) }),
+               ("PER CYCLE", configuration.map { TimeText.approximateDuration($0.secondsPerCycle) })]
+        return HStack(alignment: .top, spacing: 0) {
+            derivedValue(values[0].0, value: values[0].1 ?? "—")
+            Spacer(minLength: 8)
+            Rectangle().fill(Palette.ivory.opacity(0.12)).frame(width: 1, height: 38)
+            Spacer(minLength: 18)
+            derivedValue(values[1].0, value: values[1].1 ?? "—")
+        }
+    }
+
     private func derivedValue(_ title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(title).font(.system(size: 9, weight: .medium)).tracking(1.4).foregroundColor(Palette.muted)
@@ -73,7 +90,7 @@ struct SetupPanel: View {
     }
 }
 
-private struct StepDurationInput: View {
+private struct DurationInput: View {
     @ObservedObject var model: SessionModel
     @FocusState private var focused: Component?
     private enum Component { case minutes, seconds }
@@ -82,8 +99,8 @@ private struct StepDurationInput: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Time per step").font(.system(size: 13, weight: .medium)).foregroundColor(Palette.ivory)
-                    Text("For each form").font(.system(size: 11)).foregroundColor(Palette.muted)
+                    modeMenu
+                    Text(hint).font(.system(size: 11)).foregroundColor(Palette.muted)
                 }
                 Spacer(minLength: 0)
                 HStack(spacing: 7) {
@@ -97,31 +114,54 @@ private struct StepDurationInput: View {
                 .overlay(RoundedRectangle(cornerRadius: 7)
                     .stroke(!model.durationValid ? Palette.error : (focused != nil ? Palette.gold : Palette.ivory.opacity(0.16)), lineWidth: 1))
             }
-            if !model.durationValid {
-                Text(error).font(.system(size: 11)).foregroundColor(Palette.error)
+            if let problem = model.durationProblem {
+                Text(problem).font(.system(size: 11)).foregroundColor(Palette.error)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("step-duration-error")
             }
         }
     }
 
+    /// A drop-down in place of the field's title: choose time per step, or a total for all cycles.
+    private var modeMenu: some View {
+        Menu {
+            Picker("Set time", selection: Binding(get: { model.timingMode }, set: { model.setTimingMode($0) })) {
+                ForEach(TimingMode.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.inline).labelsHidden()
+        } label: {
+            HStack(spacing: 5) {
+                Text(model.timingMode.title).font(.system(size: 13, weight: .medium)).foregroundColor(Palette.ivory)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundColor(Palette.gold)
+            }
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+        .help("Set the time for each step, or a total shared by every step")
+        .accessibilityLabel("Set time: \(model.timingMode.title)")
+        .accessibilityIdentifier("timing-mode")
+    }
+
+    private var hint: String {
+        guard model.timingMode == .total else { return "For each form" }
+        guard let cycles = model.cycles else { return "For all cycles" }
+        return cycles == 1 ? "For 1 cycle" : "For all \(cycles) cycles"
+    }
+
     private func field(_ value: Binding<String>, unit: String, component: Component) -> some View {
-        VStack(spacing: 1) {
+        let perStep = model.timingMode == .perStep
+        return VStack(spacing: 1) {
             TextField(unit, text: value)
                 .textFieldStyle(.plain).multilineTextAlignment(.center)
                 .font(.system(size: 20, weight: .regular, design: .rounded)).monospacedDigit()
                 .foregroundColor(Palette.ivory).frame(width: 37, height: 26)
                 .focused($focused, equals: component)
-                .accessibilityLabel(component == .minutes ? "Minutes per step" : "Additional seconds per step")
+                .accessibilityLabel(component == .minutes
+                    ? (perStep ? "Minutes per step" : "Total minutes")
+                    : (perStep ? "Additional seconds per step" : "Additional total seconds"))
                 .accessibilityIdentifier(component == .minutes ? "minutes-input" : "seconds-input")
             Text(unit).font(.system(size: 9)).foregroundColor(Palette.muted).accessibilityHidden(true)
         }
-    }
-
-    private var error: String {
-        if !model.minutesValid { return "Enter whole minutes from 0 to 120." }
-        if !model.secondsValid { return "Enter whole seconds from 0 to 59." }
-        return "Choose 1 second to 120 minutes per step."
     }
 }
 

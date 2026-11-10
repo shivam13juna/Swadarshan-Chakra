@@ -1,0 +1,78 @@
+name: Release
+
+# Publish the app by pushing a version tag that matches packaging/Info.plist:
+#   git tag v1.2.0 && git push origin v1.2.0
+# A tag with a suffix, such as v1.2.0-beta.1, is published as a pre-release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@v5
+
+      - name: Show the toolchain
+        run: |
+          sw_vers
+          swift --version
+
+      - name: Match the tag to the app version
+        run: |
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' packaging/Info.plist)"
+          tag_version="${TAG#v}"
+          if [ "${tag_version%%-*}" != "$version" ]; then
+            echo "::error::Tag $TAG does not match version $version in packaging/Info.plist."
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Verify artwork, run the core checks, and compile
+        run: ./scripts/check.sh
+
+      - name: Build and sign the release app
+        run: ./scripts/build-app.sh
+
+      - name: Verify the packaged app decodes its pictures
+        run: '"dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra" --verify-resources'
+
+      - name: Package the app
+        run: |
+          archive="Swadarshan-Chakra-${TAG#v}-macOS-$(uname -m).zip"
+          # ditto keeps the bundle structure and code signature intact.
+          ditto -c -k --sequesterRsrc --keepParent "dist/Swadarshan Chakra.app" "$archive"
+          shasum -a 256 "$archive" > "$archive.sha256"
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Publish to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="$(cat <<'NOTES'
+          Swadarshan Chakra for Apple Silicon Macs running macOS 13 or newer.
+
+          **Install:** download the zip, open it, and move **Swadarshan Chakra.app** to Applications. This build is signed locally (ad hoc) rather than notarized by Apple, so the first time you open it macOS asks for confirmation: open **System Settings → Privacy & Security** and choose **Open Anyway**.
+          NOTES
+          )"
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # A release created by hand on GitHub for this tag gets the build attached.
+            gh release upload "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" --clobber
+          else
+            gh release create "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" \
+              --title "Swadarshan Chakra $VERSION" --notes "$notes" --generate-notes $prerelease
+          fi
