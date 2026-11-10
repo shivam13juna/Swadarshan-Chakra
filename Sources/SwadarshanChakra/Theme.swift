@@ -49,19 +49,18 @@ struct BrandMark: View {
     }
 }
 
-/// The header's chakra: it turns once a minute in a soft gold halo, only while the window can be
-/// seen (`active`), and holds still with Reduce Motion.
+/// The header's chakra: it turns once a minute in a soft gold halo. It turns only while the window
+/// can be seen (`active`) and holds still with Reduce Motion.
 struct SpinningBrandMark: View {
     let image: NSImage
     let size: CGFloat
     let active: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var turned = false
 
     var body: some View {
-        BrandMark(image: image)
+        TurningImage(image: image, turning: active && !reduceMotion)
             .frame(width: size, height: size)
-            .rotationEffect(.degrees(turned ? 360 : 0))
+            .accessibilityHidden(true)
             .background {
                 Circle()
                     .fill(RadialGradient(colors: [Palette.gold.opacity(0.42), Palette.gold.opacity(0)],
@@ -69,21 +68,82 @@ struct SpinningBrandMark: View {
                     .frame(width: size * 2.2, height: size * 2.2)
                     .allowsHitTesting(false)
             }
-            .onAppear(perform: updateTurning)
-            .onChange(of: active) { _ in updateTurning() }
+    }
+}
+
+/// Core Animation turns the image in the window server, so the app does no work per frame
+/// (SwiftUI redrawing it cost about a tenth of a CPU).
+private struct TurningImage: NSViewRepresentable {
+    let image: NSImage
+    let turning: Bool
+
+    func makeNSView(context: Context) -> TurningImageView { TurningImageView(image: image) }
+    func updateNSView(_ view: TurningImageView, context: Context) { view.turning = turning }
+}
+
+private final class TurningImageView: NSView {
+    private let image: NSImage
+    private let turningLayer = CALayer()
+
+    var turning = false {
+        didSet { if turning != oldValue { updateTurning() } }
+    }
+
+    init(image: NSImage) {
+        self.image = image
+        super.init(frame: .zero)
+        wantsLayer = true
+        turningLayer.contentsGravity = .resizeAspect
+        turningLayer.minificationFilter = .trilinear
+        turningLayer.isHidden = true
+        layer?.addSublayer(turningLayer)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    // Decorative: clicks reach whatever is behind it.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        turningLayer.bounds = CGRect(origin: .zero, size: bounds.size)
+        turningLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        CATransaction.commit()
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        let scale = window?.backingScaleFactor ?? 2
+        turningLayer.contentsScale = image.recommendedLayerContentsScale(scale)
+        turningLayer.contents = image.layerContents(forContentsScale: turningLayer.contentsScale)
+    }
+
+    // Still, the image is drawn like any view, so offscreen renders (the README screenshots) include it.
+    override func draw(_ dirtyRect: NSRect) {
+        guard !turning else { return }
+        image.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1,
+                   respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
     }
 
     private func updateTurning() {
-        let turning = active && !reduceMotion
-        guard turning != turned else { return }
+        if turningLayer.contents == nil { viewDidChangeBackingProperties() }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        turningLayer.isHidden = !turning
+        CATransaction.commit()
         if turning {
-            withAnimation(.linear(duration: 60).repeatForever(autoreverses: false)) { turned = true }
+            let turn = CABasicAnimation(keyPath: "transform.rotation.z")
+            turn.fromValue = 0
+            turn.toValue = -2 * Double.pi // clockwise, as on the web
+            turn.duration = 60
+            turn.repeatCount = .infinity
+            turningLayer.add(turn, forKey: "turn")
         } else {
-            // Stop at once; nothing turns in a hidden window.
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) { turned = false }
+            turningLayer.removeAnimation(forKey: "turn")
         }
+        needsDisplay = true
     }
 }
 

@@ -202,6 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if NSApp.isHidden { NSApp.unhide(nil) }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        model.windowVisible = true
         // Remove text-field focus so Return can begin, while Tab still reaches every setup control.
         window.makeFirstResponder(window.contentView)
         // Finish activation before requesting the asynchronous Space transition.
@@ -210,6 +211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func hideMeditation() {
         wantsMeditationVisible = false
+        model?.windowVisible = false
         fullScreenOnOpen = false
         model?.pause(reason: "Paused when the window was closed.")
         guard let window, fullScreenTransition == nil else { return }
@@ -320,8 +322,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return true
     }
     func windowShouldClose(_ sender: NSWindow) -> Bool { hideMeditation(); return false }
+    /// Covered completely, minimized, or on another Space: nothing on screen needs to move.
     func windowDidChangeOcclusionState(_ notification: Notification) {
-        model?.windowVisible = window?.occlusionState.contains(.visible) == true
+        model?.windowVisible = wantsMeditationVisible && window?.occlusionState.contains(.visible) == true
     }
     func windowDidBecomeKey(_ notification: Notification) {
         DispatchQueue.main.async { [weak self] in self?.enterFullScreenIfNeeded() }
