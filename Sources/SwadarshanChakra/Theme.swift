@@ -49,6 +49,44 @@ struct BrandMark: View {
     }
 }
 
+/// The header's chakra: it turns once a minute in a soft gold halo, only while the window can be
+/// seen (`active`), and holds still with Reduce Motion.
+struct SpinningBrandMark: View {
+    let image: NSImage
+    let size: CGFloat
+    let active: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var turned = false
+
+    var body: some View {
+        BrandMark(image: image)
+            .frame(width: size, height: size)
+            .rotationEffect(.degrees(turned ? 360 : 0))
+            .background {
+                Circle()
+                    .fill(RadialGradient(colors: [Palette.gold.opacity(0.42), Palette.gold.opacity(0)],
+                                         center: .center, startRadius: 0, endRadius: size * 1.1))
+                    .frame(width: size * 2.2, height: size * 2.2)
+                    .allowsHitTesting(false)
+            }
+            .onAppear(perform: updateTurning)
+            .onChange(of: active) { _ in updateTurning() }
+    }
+
+    private func updateTurning() {
+        let turning = active && !reduceMotion
+        guard turning != turned else { return }
+        if turning {
+            withAnimation(.linear(duration: 60).repeatForever(autoreverses: false)) { turned = true }
+        } else {
+            // Stop at once; nothing turns in a hidden window.
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { turned = false }
+        }
+    }
+}
+
 struct GoldButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     @Environment(\.isFocused) private var focused

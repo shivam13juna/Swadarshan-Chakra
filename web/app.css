@@ -230,7 +230,34 @@ button { cursor: pointer; }
   height: 51px;
 }
 
-.brand-mark { width: 48px; height: 48px; }
+/* The chakra turns once a minute in a soft gold halo, as in the Mac app's header. */
+.brand-mark {
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+
+.brand-mark::before {
+  content: "";
+  position: absolute;
+  inset: -60%;
+  z-index: -1;
+  background: radial-gradient(circle closest-side, rgba(217, 184, 117, 0.42), rgba(217, 184, 117, 0));
+  pointer-events: none;
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: brand-turn 60s linear infinite;
+}
+
+@keyframes brand-turn {
+  to { transform: rotate(1turn); }
+}
 
 .brand-text {
   display: flex;
@@ -1041,5 +1068,6 @@ button { cursor: pointer; }
   .view.is-visible,
   .stage-layer,
   .stage-layer .stage-large { transition: none; }
-  .cycle-chakra.is-turning { animation: none; }
+  .cycle-chakra.is-turning,
+  .brand-mark img { animation: none; }
 }

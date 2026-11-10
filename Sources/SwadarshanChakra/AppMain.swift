@@ -320,6 +320,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return true
     }
     func windowShouldClose(_ sender: NSWindow) -> Bool { hideMeditation(); return false }
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        model?.windowVisible = window?.occlusionState.contains(.visible) == true
+    }
     func windowDidBecomeKey(_ notification: Notification) {
         DispatchQueue.main.async { [weak self] in self?.enterFullScreenIfNeeded() }
     }

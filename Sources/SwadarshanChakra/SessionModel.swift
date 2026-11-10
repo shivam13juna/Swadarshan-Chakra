@@ -16,6 +16,8 @@ final class SessionModel: NSObject, ObservableObject {
     @Published var opensInFullScreen: Bool {
         didSet { defaults.set(opensInFullScreen, forKey: "opensInFullScreen") }
     }
+    /// Whether any of the meditation window is on screen. Decorative motion runs only while it is.
+    @Published var windowVisible = false
 
     var hideWindow: () -> Void = {}
     var quitApplication: () -> Void = {}

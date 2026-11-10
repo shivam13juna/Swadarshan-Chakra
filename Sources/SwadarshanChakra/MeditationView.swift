@@ -77,7 +77,7 @@ struct MeditationView: View {
 
     private func header(compact: Bool) -> some View {
         HStack(spacing: 15) {
-            BrandMark(image: artwork.brandIcon).frame(width: compact ? 40 : 48, height: compact ? 40 : 48)
+            SpinningBrandMark(image: artwork.brandIcon, size: compact ? 40 : 48, active: model.windowVisible)
             VStack(alignment: .leading, spacing: 1) {
                 Text("स्वदर्शन चक्र").font(Palette.hindi(compact ? 23 : 27)).foregroundColor(Palette.ivory)
                 Text("SWADARSHAN CHAKRA").font(.system(size: 8, weight: .medium)).tracking(2.8).foregroundColor(Palette.muted)
