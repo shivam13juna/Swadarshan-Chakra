@@ -1,17 +1,28 @@
 name: Release
 
-# Publish the app by pushing a version tag that matches packaging/Info.plist:
-#   git tag v1.2.0 && git push origin v1.2.0
-# A tag with a suffix, such as v1.2.0-beta.1, is published as a pre-release.
+# Every push to main that changes the app builds it and publishes it to GitHub Releases as
+# v<version>, using CFBundleShortVersionString from packaging/Info.plist:
+#   - a new version gets a new release;
+#   - an existing version's release gets the new build, and its tag moves to this commit.
+# Raise the version in packaging/Info.plist when a change should be a new release.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths:
+      - "Sources/**"
+      - "Tests/MeditationCoreTests/**"
+      - "Package.swift"
+      - "packaging/**"
+      - "scripts/**"
+      - "5_pictures/**"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref_name }}
+  group: release
   cancel-in-progress: false
 
 jobs:
@@ -19,10 +30,8 @@ jobs:
     name: Build and publish
     runs-on: macos-latest
     timeout-minutes: 30
-    env:
-      TAG: ${{ github.ref_name }}
     steps:
-      - name: Check out the tagged source
+      - name: Check out the source
         uses: actions/checkout@v5
 
       - name: Show the toolchain
@@ -30,15 +39,11 @@ jobs:
           sw_vers
           swift --version
 
-      - name: Match the tag to the app version
+      - name: Read the app version
         run: |
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' packaging/Info.plist)"
-          tag_version="${TAG#v}"
-          if [ "${tag_version%%-*}" != "$version" ]; then
-            echo "::error::Tag $TAG does not match version $version in packaging/Info.plist."
-            exit 1
-          fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "TAG=v$version" >> "$GITHUB_ENV"
 
       - name: Verify artwork, run the core checks, and compile
         run: ./scripts/check.sh
@@ -51,7 +56,7 @@ jobs:
 
       - name: Package the app
         run: |
-          archive="Swadarshan-Chakra-${TAG#v}-macOS-$(uname -m).zip"
+          archive="Swadarshan-Chakra-$VERSION-macOS-$(uname -m).zip"
           # ditto keeps the bundle structure and code signature intact.
           ditto -c -k --sequesterRsrc --keepParent "dist/Swadarshan Chakra.app" "$archive"
           shasum -a 256 "$archive" > "$archive.sha256"
@@ -61,18 +66,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes="$(cat <<'NOTES'
-          Swadarshan Chakra for Apple Silicon Macs running macOS 13 or newer.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Same version: replace the build and point the tag at the commit it was built from.
+            gh release upload "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" --clobber
+            git tag -f "$TAG" "$GITHUB_SHA"
+            git push -f origin "refs/tags/$TAG"
+            echo "Updated $TAG with the build of ${GITHUB_SHA::7}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            notes="$(cat <<'NOTES'
+          Swadarshan Chakra for Apple Silicon Macs running macOS 13 or newer. You can also practice in your browser at https://swadarshan-chakra.web.app.
 
           **Install:** download the zip, open it, and move **Swadarshan Chakra.app** to Applications. This build is signed locally (ad hoc) rather than notarized by Apple, so the first time you open it macOS asks for confirmation: open **System Settings → Privacy & Security** and choose **Open Anyway**.
           NOTES
-          )"
-          prerelease=""
-          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            # A release created by hand on GitHub for this tag gets the build attached.
-            gh release upload "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" --clobber
-          else
-            gh release create "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" \
-              --title "Swadarshan Chakra $VERSION" --notes "$notes" --generate-notes $prerelease
+            )"
+            gh release create "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" --target "$GITHUB_SHA" \
+              --title "Swadarshan Chakra $VERSION" --notes "$notes" --generate-notes
+            echo "Published $TAG from ${GITHUB_SHA::7}." >> "$GITHUB_STEP_SUMMARY"
           fi

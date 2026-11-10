@@ -4,3 +4,6 @@
 dist/
 .artifacts/
 *.xcodeproj/xcuserdata/
+.firebase/
+firebase-debug.log*
+pglite-debug.log

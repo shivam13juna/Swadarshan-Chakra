@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/shivam13juna/Swadarshan-Chakra/releases/latest"><b>Download the latest release</b></a>
+  <a href="https://github.com/shivam13juna/Swadarshan-Chakra/releases/latest"><b>Download for Mac</b></a> · <a href="https://swadarshan-chakra.web.app"><b>Practice in your browser</b></a>
   <br>
-  <sub>macOS 13 Ventura or later · Apple Silicon · Free · Works entirely offline</sub>
+  <sub>Mac app: macOS 13 Ventura or later · Apple Silicon · Free · Works entirely offline</sub>
 </p>
 
 <br>
@@ -23,6 +23,8 @@
 Swadarshan Chakra guides you through five consecutive forms of spiritual self-awareness, one at a time. Each form's picture fills your screen while you contemplate it. When its time is up, the next form begins, and after the fifth, the circle starts again. One pass through all five forms is a **cycle**.
 
 You choose how many cycles to practice and how much time to give them. The app keeps time, so you don't have to.
+
+No Mac, or nothing to install? The same practice runs in any modern browser at **[swadarshan-chakra.web.app](https://swadarshan-chakra.web.app)**, on a computer or a phone. Your settings stay in that browser.
 
 ### The five steps
 
@@ -165,13 +167,14 @@ APP="dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra"
 "$APP" --render-previews <folder>    # renders every screen to PNG, as used for the screenshots here
 ```
 
-**Releasing.** Set `CFBundleShortVersionString` in `packaging/Info.plist`, commit, and push a matching tag:
+**Web version.** `web/` is the same practice for the browser, with no build step. `engine.js` is a port of `MeditationCore`; `Tests/web/engine-checks.mjs` mirrors the core checks, and `check.sh` runs it when Node is installed. `app.js` and `app.css` follow the SwiftUI screens. Preview it locally with `firebase serve --only hosting`.
 
-```sh
-git tag v1.2.0 && git push origin v1.2.0
-```
+**Publishing.** Pushing to `main` publishes both:
 
-The [release workflow](.github/workflows/release.yml) checks that the tag matches the version, runs the checks, builds and signs the app, verifies it, and publishes `Swadarshan-Chakra-<version>-macOS-arm64.zip` with a SHA-256 checksum. A tag such as `v1.2.0-beta.1` becomes a pre-release. Removing the first-launch prompt would require Apple notarization with a Developer ID.
+- **The Mac app.** The [release workflow](.github/workflows/release.yml) runs when a push changes the app. It runs the checks, then builds, signs, and verifies the app. It publishes `Swadarshan-Chakra-<version>-macOS-arm64.zip`, with a SHA-256 checksum, as release `v<version>`, using `CFBundleShortVersionString` from `packaging/Info.plist`. A new version gets a new release. Otherwise the current version's release gets the new build, and its tag moves to that commit.
+- **The website.** The [website workflow](.github/workflows/website.yml) runs when a push changes `web/`. It checks the engine and deploys to Firebase Hosting, using the `FIREBASE_SERVICE_ACCOUNT` repository secret. That secret is a key for the `github-deploy` service account, which can only manage Hosting.
+
+Either workflow can also be run by hand from the Actions tab. Removing the Mac app's first-launch prompt would require Apple notarization with a Developer ID.
 
 **Project layout**
 
@@ -180,6 +183,9 @@ The [release workflow](.github/workflows/release.yml) checks that the tag matche
 | `Sources/MeditationCore` | Settings, the five forms, and the session state machine: timing, cycles, pause, and Space |
 | `Sources/SwadarshanChakra` | The macOS app: the menu bar item, the window and full screen, and the SwiftUI screens |
 | `Tests/MeditationCoreTests` | 37 deterministic checks that run without Xcode |
+| `web` | The web version, published to [swadarshan-chakra.web.app](https://swadarshan-chakra.web.app) |
+| `Tests/web` | Node checks for the web version's engine |
+| `docs` | The screenshots and icon this README uses |
 | `5_pictures` | The five original pictures. The bundled copies must match them byte for byte, and `Stage.swift` maps each to its form |
 | `scripts` | Build, check, icon, and artwork-verification scripts |
 

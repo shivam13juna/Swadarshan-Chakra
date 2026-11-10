@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Swadarshan Chakra · स्वदर्शन चक्र</title>
+  <meta name="description" content="Practice the Swadarshan Chakra meditation in your browser: five forms, one complete cycle, timed for you. No account and no tracking.">
+  <meta name="theme-color" content="#070A15">
+  <meta name="color-scheme" content="dark">
+  <link rel="canonical" href="https://swadarshan-chakra.web.app/">
+  <link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
+  <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Swadarshan Chakra">
+  <meta property="og:title" content="Swadarshan Chakra · स्वदर्शन चक्र">
+  <meta property="og:description" content="Practice the Swadarshan Chakra meditation in your browser: five forms, one complete cycle, timed for you.">
+  <meta property="og:url" content="https://swadarshan-chakra.web.app/">
+  <meta property="og:image" content="https://swadarshan-chakra.web.app/images/social.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The five forms arranged in a circle beside the practice settings">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div class="background" aria-hidden="true"></div>
+
+  <main id="app" data-phase="ready">
+    <!-- Setup and completion (MeditationView.overview) -->
+    <section id="overview" class="view overview is-visible" aria-labelledby="brand-name">
+      <header class="overview-header">
+        <img class="brand-mark" src="images/icon.png" width="256" height="256" alt="">
+        <div class="brand-text">
+          <h1 id="brand-name" class="brand-hindi" lang="hi">स्वदर्शन चक्र</h1>
+          <p class="brand-latin">Swadarshan Chakra</p>
+        </div>
+        <p class="status"><span class="status-dot" aria-hidden="true"></span><span id="status-label">Ready when you are</span></p>
+        <button type="button" class="quiet-button icon-button" data-action="fullscreen" aria-label="Enter full screen" title="Full screen (F)">
+          <svg class="icon icon-enter" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+          <svg class="icon icon-exit" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M14 10h-4v4M2 10h4v4"/></svg>
+        </button>
+      </header>
+
+      <div class="overview-body">
+        <div id="orbit" class="orbit is-preview" role="group" aria-label="Five spiritual forms, in clockwise order">
+          <svg class="orbit-rings" aria-hidden="true">
+            <ellipse id="ring" class="ring"/>
+            <ellipse id="ring-dashed" class="ring-dashed"/>
+            <g id="chevrons"></g>
+          </svg>
+          <img id="orbit-chakra" class="orbit-chakra" src="images/icon.png" width="256" height="256" alt="">
+          <div id="orbit-focus" class="orbit-focus">
+            <div id="active-focus" class="active-focus">
+              <p id="focus-eyebrow" class="eyebrow">Form 01 / 05</p>
+              <img id="focus-art" class="focus-art" src="art/form-1-small.jpg" alt="">
+              <p id="focus-title" class="focus-title" lang="hi"></p>
+              <p id="focus-context" class="focus-context" lang="hi"></p>
+            </div>
+            <div id="completion-focus" class="completion-focus" hidden>
+              <svg class="seal" viewBox="0 0 40 40" aria-hidden="true"><path id="seal-outline"/><path d="M14 20.5l4.2 4.2 8-8.7"/></svg>
+              <div>
+                <h2 class="completion-title">Meditation complete</h2>
+                <p id="completed-cycles" class="completion-cycles"></p>
+              </div>
+              <div class="completion-summary">
+                <div><p class="label">Practiced</p><p id="practiced-time" class="value"></p></div>
+                <span class="completion-divider" aria-hidden="true"></span>
+                <div><p class="label">Planned</p><p id="planned-time" class="value"></p></div>
+              </div>
+              <button type="button" class="gold-button" data-action="practice-again">Practice again</button>
+            </div>
+          </div>
+        </div>
+
+        <form id="setup" class="setup-panel" novalidate>
+          <div class="setup-intro">
+            <p class="eyebrow">Your practice</p>
+            <h2 class="setup-title">Your quiet moment.</h2>
+            <p class="setup-subtitle">Five forms. One complete cycle.</p>
+          </div>
+          <div class="setup-rule" aria-hidden="true"></div>
+          <div class="setup-fields">
+            <div class="field">
+              <div class="field-row">
+                <div class="field-label">
+                  <label class="field-title" for="cycles-input">Cycles</label>
+                  <p class="field-hint">1–108 rounds</p>
+                </div>
+                <div id="cycles-box" class="input-box stepper">
+                  <button type="button" class="stepper-button" data-step="-1" aria-label="Decrease cycles">
+                    <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6"/></svg>
+                  </button>
+                  <input id="cycles-input" class="number-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="cycles-error">
+                  <button type="button" class="stepper-button" data-step="1" aria-label="Increase cycles">
+                    <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6M5 2v6"/></svg>
+                  </button>
+                </div>
+              </div>
+              <p id="cycles-error" class="field-error" hidden>Enter a whole number from 1 to 108.</p>
+            </div>
+
+            <div class="field">
+              <div class="field-row">
+                <div class="field-label">
+                  <div class="mode-select">
+                    <select id="timing-mode" aria-label="Set time" title="Set the time for each step, or a total shared by every step">
+                      <option value="perStep">Time per step</option>
+                      <option value="total">Total time</option>
+                    </select>
+                    <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3"/></svg>
+                  </div>
+                  <p id="duration-hint" class="field-hint">For each form</p>
+                </div>
+                <div id="duration-box" class="input-box duration">
+                  <div class="duration-part">
+                    <input id="minutes-input" class="number-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="duration-error">
+                    <span class="unit" aria-hidden="true">min</span>
+                  </div>
+                  <span class="duration-colon" aria-hidden="true">:</span>
+                  <div class="duration-part">
+                    <input id="seconds-input" class="number-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="duration-error">
+                    <span class="unit" aria-hidden="true">sec</span>
+                  </div>
+                </div>
+              </div>
+              <p id="duration-error" class="field-error" hidden></p>
+            </div>
+          </div>
+
+          <div class="summary">
+            <div class="summary-value"><p id="summary-label-1" class="label"></p><p id="summary-value-1" class="value"></p></div>
+            <span class="summary-divider" aria-hidden="true"></span>
+            <div class="summary-value"><p id="summary-label-2" class="label"></p><p id="summary-value-2" class="value"></p></div>
+          </div>
+
+          <div class="setup-actions">
+            <button id="begin-button" type="submit" class="gold-button begin-button">
+              <svg class="icon icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.6v10.8L13.2 8z"/></svg>
+              <span>Begin meditation</span>
+              <svg class="icon icon-return" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 3v5a2 2 0 0 1-2 2H4M6.5 7.5 4 10l2.5 2.5"/></svg>
+            </button>
+            <p id="setup-note" class="setup-note"></p>
+          </div>
+        </form>
+      </div>
+
+      <footer class="overview-footer">
+        <p id="footer-shortcut" class="shortcut"><kbd>Space</kbd><span>Next step during practice</span></p>
+        <label id="fullscreen-setting" class="checkbox" title="Untick to practice in this window. The full-screen button or F switches at any time.">
+          <input id="opens-full-screen" type="checkbox">
+          <span>Open in full screen</span>
+        </label>
+        <p class="footer-tag">No account · No tracking</p>
+      </footer>
+    </section>
+
+    <!-- The card that opens every cycle (CycleIntroductionView) -->
+    <section id="cycle-card" class="view cycle-card" aria-labelledby="cycle-card-title">
+      <div class="corner-bar">
+        <div class="counters"><p id="card-cycle-counter" class="capsule"></p></div>
+        <button type="button" class="artwork-button icon-button" data-action="fullscreen" aria-label="Enter full screen" title="Full screen (F)">
+          <svg class="icon icon-enter" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+          <svg class="icon icon-exit" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M14 10h-4v4M2 10h4v4"/></svg>
+        </button>
+      </div>
+      <div class="cycle-card-center">
+        <img id="cycle-chakra" class="cycle-chakra" src="images/icon.png" width="256" height="256" alt="">
+        <h2 id="cycle-card-title" class="cycle-card-title">Cycle 1</h2>
+      </div>
+    </section>
+
+    <!-- One form, filling the screen (FullScreenStageView) -->
+    <section id="stage" class="view stage" aria-label="Practice">
+      <div id="stage-art" class="stage-art" role="img"></div>
+      <div class="stage-shade stage-shade-top" aria-hidden="true"></div>
+      <div class="stage-shade stage-shade-bottom" aria-hidden="true"></div>
+      <div class="stage-overlay">
+        <div class="corner-bar">
+          <div class="counters">
+            <p id="stage-cycle-counter" class="capsule"></p>
+            <p id="step-counter" class="capsule">
+              <span id="step-text" aria-hidden="true"></span>
+              <span id="paused-label" class="paused-label" aria-hidden="true" hidden>
+                <svg class="icon icon-pause-fill" viewBox="0 0 16 16"><path d="M4.5 3h2.4v10H4.5zM9.1 3h2.4v10H9.1z"/></svg>Paused
+              </span>
+            </p>
+          </div>
+          <button type="button" class="artwork-button icon-button" data-action="fullscreen" aria-label="Enter full screen" title="Full screen (F)">
+            <svg class="icon icon-enter" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+            <svg class="icon icon-exit" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M14 10h-4v4M2 10h4v4"/></svg>
+          </button>
+        </div>
+
+        <div class="stage-bottom">
+          <div class="stage-info">
+            <p id="stage-title" class="stage-title" lang="hi"></p>
+            <p id="stage-context" class="stage-context" lang="hi"></p>
+            <p class="stage-meta">
+              <span id="remaining-time" class="remaining"></span>
+              <span class="meta-divider" aria-hidden="true"></span>
+              <span id="cycles-completed" class="cycles-completed"></span>
+            </p>
+          </div>
+
+          <div class="stage-controls">
+            <div id="running-controls" class="controls-group">
+              <div class="button-row">
+                <button type="button" class="artwork-button" data-action="pause">
+                  <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5v9M10.5 3.5v9"/></svg>Pause
+                </button>
+                <button type="button" class="artwork-button" data-action="next">
+                  <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>Next step
+                </button>
+              </div>
+              <p class="hints">
+                <span class="shortcut light"><kbd>Esc</kbd><span>Pause</span></span>
+                <span class="shortcut light"><kbd>Space</kbd><span>Next step</span></span>
+              </p>
+            </div>
+            <div id="paused-controls" class="controls-group" hidden>
+              <div class="button-row">
+                <button type="button" class="artwork-button prominent" data-action="resume">
+                  <svg class="icon icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.6v10.8L13.2 8z"/></svg>Resume
+                </button>
+                <button type="button" class="artwork-button" data-action="restart" title="Restart practice (R)">Restart</button>
+                <button type="button" class="artwork-button" data-action="end" title="End practice (E)">End</button>
+              </div>
+              <p id="pause-reason" class="pause-reason"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Restart or end (ConfirmationOverlay) -->
+    <div id="confirmation" class="confirmation" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message" hidden>
+      <div class="confirm-panel">
+        <img class="confirm-mark" src="images/icon.png" width="256" height="256" alt="">
+        <div class="confirm-text">
+          <h2 id="confirm-title" class="confirm-title"></h2>
+          <p id="confirm-message" class="confirm-message"></p>
+        </div>
+        <div class="confirm-buttons">
+          <button id="keep-practicing" type="button" class="quiet-button" data-action="cancel-confirmation">Keep practicing</button>
+          <button id="confirm-button" type="button" class="gold-button" data-action="confirm"></button>
+        </div>
+        <p id="confirm-hint" class="confirm-hint"></p>
+      </div>
+    </div>
+
+    <p id="announcer" class="visually-hidden" aria-live="polite"></p>
+  </main>
+</body>
+</html>

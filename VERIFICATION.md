@@ -18,6 +18,8 @@ Validated on this Mac with macOS 27.2, Apple Silicon, and Swift 6.3.3. The app's
 | Saved settings | Exact legacy conversion (including 7 minutes per cycle → 1:24 per step), new-setting precedence, persistence, and invalid-value fallback covered |
 | Space and cycle boundaries | Single-stage advance, held-key rejection, stale event rejection, both timer/key race orderings, and final Stage 5 completion covered |
 | Pause and confirmation | Exact remaining time preserved; paused Space ignored; restart/end/quit and cancellation covered |
+| Web version | `web/engine.js` passes 20 Node checks that mirror the core checks. A full practice was driven in headless Chromium through the DevTools protocol at 1440×900, 1024×640, and 390×844. It covered setup, total-time summaries and validation, cycle cards, Space, Esc, Return, restart and end confirmation, and completion, with no console errors or Content Security Policy violations. Safari, Firefox, and real full-screen mode in a browser have not been tried |
+| Website deployment | Deployed to Firebase Hosting with the `github-deploy` service account key that the website workflow uses. Neither GitHub workflow has run on GitHub yet |
 | Original artwork | All five embedded images match the supplied files byte for byte |
 | Supplied branding | Bundled `Branding/icon.png` matches the owner's original exactly; the header, dialogs, menu bar, and application icon use that supplied image |
 | System app icon (1.1.2) | Actual macOS icon renders inspected at 32 px and 256 px; the chakra is larger with a narrower white rim, and the release signature passes |

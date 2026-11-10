@@ -1,0 +1,53 @@
+name: Website
+
+# Every push to main that changes the web version publishes it to https://swadarshan-chakra.web.app.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "Tests/web/**"
+      - "firebase.json"
+      - ".firebaserc"
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Check and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Check the practice engine
+        run: node Tests/web/engine-checks.mjs
+
+      - name: Deploy to Firebase Hosting
+        env:
+          # A Google service account key (JSON) allowed to deploy Firebase Hosting for swadarshan-chakra.
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Add the FIREBASE_SERVICE_ACCOUNT repository secret to deploy the website."
+            exit 1
+          fi
+          key="$RUNNER_TEMP/firebase-service-account.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"
+          export GOOGLE_APPLICATION_CREDENTIALS="$key"
+          npx --yes firebase-tools@14 deploy --only hosting --project swadarshan-chakra \
+            --non-interactive --message "Deployed from ${GITHUB_SHA::7}"
+          rm -f "$key"
