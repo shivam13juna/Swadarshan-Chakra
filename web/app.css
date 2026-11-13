@@ -872,6 +872,23 @@ button { cursor: pointer; }
 .stage-shade-top { top: 0; height: min(22%, 170px); background: linear-gradient(rgba(0, 0, 0, 0.28), transparent); }
 .stage-shade-bottom { bottom: 0; height: min(40%, 290px); background: linear-gradient(transparent, rgba(0, 0, 0, 0.72)); }
 
+/* StepMeter: the time left in this step, out of its full time, along the bottom edge. */
+.step-meter {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+}
+
+.step-meter-fill {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  transform-origin: left center;
+}
+
 .stage-overlay {
   position: absolute;
   inset: 0;

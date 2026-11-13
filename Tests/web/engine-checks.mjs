@@ -155,6 +155,19 @@ check("pause keeps the exact remaining time and ignores Space", () => {
   near(engine.remainingSeconds, 46.5, "resumes counting");
 });
 
+check("progress is the share of the step already practiced", () => {
+  const engine = stageEngine();
+  engine.begin(perStep(1, 1), 0);
+  near(engine.progress, 0, "start");
+  engine.tick(15);
+  near(engine.progress, 0.25, "a quarter in");
+  engine.pause(30);
+  near(engine.progress, 0.5, "paused halfway");
+  engine.resume(100);
+  engine.nextStage(100);
+  near(engine.progress, 0, "the next step starts afresh");
+});
+
 check("held Space and stale events never skip", () => {
   const engine = stageEngine();
   engine.begin(perStep(1, 1), 0);

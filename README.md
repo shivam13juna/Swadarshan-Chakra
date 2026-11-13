@@ -95,6 +95,7 @@ The panel shows what your choice works out to. Press **Begin meditation** (or <k
 Each step fills your screen, as in [the five steps](#the-five-steps) above.
 
 - The current **cycle** and **step** are in the top-left corner. The form's name and the time remaining are at the bottom.
+- A thin white bar along the bottom edge shows how much of the step's time is left. It is full as the step begins, empties as the time runs out, and holds still while paused.
 - When a step's time is up, the next one begins by itself. Ready sooner? Press <kbd>Space</kbd>.
 - <kbd>Esc</kbd> pauses. From there you can resume, restart, or end the practice.
 - If you switch to another app, close the window, or your Mac goes to sleep, the practice pauses and waits for you. Nothing moves on while you're away.
@@ -162,7 +163,7 @@ The app also has built-in checks:
 ```sh
 APP="dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra"
 "$APP" --verify-resources            # the packaged app decodes all five pictures
-"$APP" --verify-timer                # live 3-second cycle card and 12-second step; about 16 s, no window
+"$APP" --verify-timer                # live 3-second cycle card, 12-second step, and step bar; about 17 s, off screen
 "$APP" --smoke-test                  # drives the real full-screen window; about 45 s, takes over the screen
 "$APP" --render-previews <folder>    # renders every screen to PNG, as used for the screenshots here
 ```

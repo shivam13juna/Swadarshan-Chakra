@@ -53,6 +53,7 @@ enum CoreCheckRunner {
             ("Input validation", suite.testValidationRejectsOutOfRangeAndNonWholeInputs),
             ("Automatic cycles and completion", suite.testAllAutomaticSessionsFinishAtPlannedActiveTime),
             ("Space discards only current time", suite.testSpaceDiscardsOnlyCurrentStageRemainder),
+            ("Step progress", suite.testProgressIsTheShareOfTheStepPracticed),
             ("Stage 5 and manual completion", suite.testStageFiveCountsCycleAndFinalManualAdvanceCompletes),
             ("Key repeat", suite.testKeyRepeatNeverAdvances),
             ("Timer then Space at boundary", suite.testAutomaticThenSpaceAtSameBoundaryIsOneTransition),

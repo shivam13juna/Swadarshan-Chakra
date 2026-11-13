@@ -4,21 +4,22 @@ Validated on this Mac with macOS 27.2, Apple Silicon, and Swift 6.3.3. The app's
 
 | Check | Result |
 | --- | --- |
-| Deterministic session engine and settings | 37 checks, 537 assertions, zero failures |
+| Deterministic session engine and settings | 38 checks, 541 assertions, zero failures |
 | Packaged release native integration | 43 checks passed on version 1.1.1; updated for cycle cards and total time in 1.2.0, not yet re-run |
 | Total time | Shared equally by every step; the planned total stays exact for uneven splits (10 minutes for 7 cycles); minimum of 1 second per step, 600-minute maximum, mode switching that keeps the practice, and saved-setting fallback covered |
 | Cycle cards | Every cycle opens with a card that uses no practice time; Space begins the first step early, pausing begins the cycle with a full first step, a key press at the card's end is coalesced, and the last cycle ends in completion |
 | Native full screen | Window style and system state both confirm native full-screen mode; `NSMenu.menuBarVisible()` confirms the menu bar is hidden; Dock auto-hide is enabled (1.1.1 run). Leaving full screen into an ordinary window and the "Open in full screen" setting are covered by the updated smoke test, not yet run |
 | Window lifecycle | Close exits full screen and restores menu-bar-only operation; reopening preserves the exact paused timer; reopening during an exit transition also passes |
 | Focus and absence | Actual key-window transfer pauses practice; local sleep notification and the lock handler pass |
-| Packaged release live timer | All four 1.2.0 checks passed: practice opens with the Cycle 1 card, the card lasts three seconds before a full first step, 12 seconds per step advances exactly once, and the next step receives a fresh full countdown |
+| Packaged release live timer | All five checks passed: practice opens with the Cycle 1 card, the card lasts three seconds before a full first step, 12 seconds per step advances exactly once, the next step receives a fresh full countdown, and the step bar (in an offscreen window) empties at the timer's rate and holds still while paused |
+| Step bar | A 4-point white bar along the bottom edge of every step shows the share of the step's time left. In the layout captures it ends at 78.3% of the width at 0:47 of 1:00 (running, paused, compact) and at 75% at 0:45 (paused second cycle). Core Animation runs the countdown, so the app does no work per frame; the live timer check measured the glide within 5% of the step's length |
 | Release packaging | The workflow's zip and SHA-256 steps run locally; the checksum verifies and the unzipped app's signature passes `codesign --verify --deep --strict` |
 | Input validation | Invalid cycles, zero-length steps, blank values, negatives, decimals, and out-of-range components rejected |
 | Per-step timing | Minutes and seconds are assigned in full to every step; cycle and session totals are calculated automatically |
 | Saved settings | Exact legacy conversion (including 7 minutes per cycle → 1:24 per step), new-setting precedence, persistence, and invalid-value fallback covered |
 | Space and cycle boundaries | Single-stage advance, held-key rejection, stale event rejection, both timer/key race orderings, and final Stage 5 completion covered |
 | Pause and confirmation | Exact remaining time preserved; paused Space ignored; restart/end/quit and cancellation covered |
-| Web version | `web/engine.js` passes 20 Node checks that mirror the core checks. A full practice was driven in headless Chromium through the DevTools protocol at 1440×900, 1024×640, and 390×844. It covered setup, total-time summaries and validation, cycle cards, Space, Esc, Return, restart and end confirmation, and completion, with no console errors or Content Security Policy violations. Safari, Firefox, and real full-screen mode in a browser have not been tried |
+| Web version | `web/engine.js` passes 21 Node checks that mirror the core checks. A full practice was driven in headless Chromium through the DevTools protocol at 1440×900, 1024×640, and 390×844. It covered setup, total-time summaries and validation, cycle cards, Space, Esc, Return, restart and end confirmation, and completion, with no console errors or Content Security Policy violations. The step bar was sampled with 8-second steps under the site's real headers: it empties at the timer's rate (within 1%), holds still on Esc, continues from the same place on Return, and starts full after Space and after a step runs out, at 1440×900 and 390×844. Safari, Firefox, and real full-screen mode in a browser have not been tried |
 | Website deployment | Deployed to Firebase Hosting with the `github-deploy` service account key that the website workflow uses. Neither GitHub workflow has run on GitHub yet |
 | Original artwork | All five embedded images match the supplied files byte for byte |
 | Supplied branding | Bundled `Branding/icon.png` matches the owner's original exactly; the header, dialogs, menu bar, and application icon use that supplied image |

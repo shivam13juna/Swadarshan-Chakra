@@ -412,8 +412,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func verifyLiveTimer() async throws {
         let suiteName = "com.swadarshan.chakra.timer-check"
         let probe = SessionModel(defaults: UserDefaults(suiteName: suiteName)!)
+        // The probe's screens, in a window of their own off screen, so the step bar runs live as well.
+        let screens = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 1024, height: 640),
+                               styleMask: .borderless, backing: .buffered, defer: false)
+        screens.isReleasedWhenClosed = false
+        screens.contentView = NSHostingView(rootView: MeditationView(model: probe, artwork: artwork))
+        screens.orderFront(nil)
+        probe.windowVisible = true
         defer {
             probe.pause()
+            screens.close()
             UserDefaults.standard.removePersistentDomain(forName: suiteName)
         }
         func failure(_ code: Int, _ message: String) -> NSError {
@@ -452,6 +460,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             throw failure(4, "Automatic advance did not start a fresh full countdown")
         }
         print("PASS Automatic advance starts a fresh full countdown")
+
+        func stepMeter(in view: NSView) -> StepMeterView? {
+            if let found = view as? StepMeterView { return found }
+            for subview in view.subviews { if let found = stepMeter(in: subview) { return found } }
+            return nil
+        }
+        guard let host = screens.contentView, let meter = stepMeter(in: host) else {
+            throw failure(5, "The step screen has no bar along its bottom edge")
+        }
+        let firstTime = SessionModel.now, first = meter.shownFraction
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+        let laterTime = SessionModel.now, later = meter.shownFraction
+        // Per second, the bar should lose one step's worth of its length divided by the step's seconds.
+        let rate = (first - later) / (laterTime - firstTime) * probe.engine.configuration.secondsPerStage
+        guard first > 0.95, abs(rate - 1) < 0.05, abs(later - (1 - probe.engine.progress)) < 0.03 else {
+            throw failure(5, "The step bar did not empty with the live timer (from \(first) to \(later), rate \(rate))")
+        }
+        probe.pause()
+        try await Task.sleep(nanoseconds: 300_000_000)
+        let held = meter.shownFraction
+        try await Task.sleep(nanoseconds: 500_000_000)
+        guard held == meter.shownFraction, abs(held - (1 - probe.engine.progress)) < 0.001 else {
+            throw failure(6, "The step bar did not hold still while paused")
+        }
+        print("PASS The step bar empties with the live timer and holds still while paused")
     }
 
     private func runSmokeTest() {

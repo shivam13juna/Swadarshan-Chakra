@@ -246,6 +246,7 @@ const cyclesCompleted = byId("cycles-completed");
 const runningControls = byId("running-controls");
 const pausedControls = byId("paused-controls");
 const pauseReason = byId("pause-reason");
+const stepMeterFill = byId("step-meter-fill");
 
 const confirmation = byId("confirmation");
 const confirmTitle = byId("confirm-title");
@@ -569,6 +570,31 @@ function renderStage() {
   runningControls.hidden = !running;
   pausedControls.hidden = running;
   setText(pauseReason, model.pauseReason);
+  renderStepMeter();
+}
+
+let meterStep = null;
+let meterGlide = null;
+
+/// StepMeter: the bar along the bottom empties as the step's time runs out and holds still while
+/// paused. The browser runs the glide between ticks, on the compositor, with no work per frame.
+function renderStepMeter() {
+  const fraction = 1 - engine.progress;
+  // A step coming into view, or the next step, starts the bar afresh, like a new StepMeterView.
+  const fresh = shownView !== "stage" || meterStep !== engine.transitionCount;
+  meterStep = engine.transitionCount;
+  if (engine.phase !== "running") {
+    meterGlide?.cancel();
+    meterGlide = null;
+    stepMeterFill.style.transform = `scaleX(${fraction})`;
+  } else if (fresh || !meterGlide) {
+    meterGlide?.cancel();
+    stepMeterFill.style.transform = "scaleX(0)";
+    meterGlide = stepMeterFill.animate(
+      [{ transform: `scaleX(${fraction})` }, { transform: "scaleX(0)" }],
+      { duration: Math.max(engine.remainingSeconds, 0.01) * 1000, easing: "linear" },
+    );
+  }
 }
 
 function renderConfirmation() {

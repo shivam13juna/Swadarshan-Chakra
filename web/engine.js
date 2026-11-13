@@ -173,6 +173,10 @@ export class SessionEngine {
   get currentStage() { return STAGES[this.stageIndex]; }
   get currentCycle() { return Math.min(this.completedCycles + 1, this.configuration.cycles); }
   get isIntroducingCycle() { return this.phase === "running" && this.introductionRemaining > 0; }
+  /// The share of this step's time already practiced, from 0 to 1.
+  get progress() {
+    return Math.min(1, Math.max(0, 1 - this.remainingSeconds / this.configuration.secondsPerStage));
+  }
 
   begin(configuration, now) {
     this.reset();

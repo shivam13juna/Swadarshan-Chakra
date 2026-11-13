@@ -57,6 +57,10 @@ struct FullScreenStageView: View {
                 .padding(.horizontal, padding)
                 .padding(.top, max(padding, topInset + 12))
                 .padding(.bottom, padding)
+
+                // How much of this step's time is left, along the bottom edge.
+                StepMeter(engine: engine, moving: model.windowVisible)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
             .frame(width: size.width, height: size.height)
             .clipped()
@@ -173,6 +177,116 @@ struct CycleCounter: View {
         }
         .accessibilityLabel("Cycle \(engine.currentCycle) of \(engine.configuration.cycles)")
         .accessibilityIdentifier("cycle-counter")
+    }
+}
+
+/// A thin white bar along the bottom edge: the time left in this step, out of its full time. It is
+/// full as a step begins, empties as the countdown runs, and holds still while paused.
+struct StepMeter: View {
+    let engine: SessionEngine
+    /// Whether the window can be seen. The bar glides only then; otherwise it is drawn still.
+    let moving: Bool
+
+    var body: some View {
+        StepMeterBar(fraction: 1 - engine.progress, remaining: engine.remainingSeconds,
+                     step: engine.transitionCount, gliding: moving && engine.phase == .running)
+            .frame(height: 4)
+            .allowsHitTesting(false)
+            // The countdown beside the title already says how long is left.
+            .accessibilityHidden(true)
+    }
+}
+
+private struct StepMeterBar: NSViewRepresentable {
+    let fraction: Double
+    let remaining: TimeInterval
+    let step: Int
+    let gliding: Bool
+
+    func makeNSView(context: Context) -> StepMeterView { StepMeterView() }
+    func updateNSView(_ view: StepMeterView, context: Context) {
+        view.show(fraction: fraction, remaining: remaining, step: step, gliding: gliding)
+    }
+}
+
+/// Core Animation runs the countdown in the window server, as it turns the header chakra: the bar
+/// glides between the timer's ticks while the app does no work per frame.
+final class StepMeterView: NSView {
+    private static let trackColor = NSColor(white: 1, alpha: 0.2)
+    private static let fillColor = NSColor(white: 1, alpha: 0.9)
+    private let trackLayer = CALayer()
+    private let fillLayer = CALayer()
+    private var fraction = 1.0
+    private var step: Int?
+    private var gliding = false
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        trackLayer.backgroundColor = Self.trackColor.cgColor
+        fillLayer.backgroundColor = Self.fillColor.cgColor
+        fillLayer.anchorPoint = CGPoint(x: 0, y: 0.5)   // It shortens toward the left edge.
+        for sublayer in [trackLayer, fillLayer] {
+            sublayer.isHidden = true
+            layer?.addSublayer(sublayer)
+        }
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    /// What the bar shows at this moment, as a share of the step's time, for the live timer check.
+    var shownFraction: Double {
+        guard gliding else { return fraction }
+        return (fillLayer.presentation() ?? fillLayer).value(forKeyPath: "transform.scale.x") as? Double ?? 0
+    }
+
+    // Decorative: clicks reach whatever is behind it.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        trackLayer.frame = bounds
+        fillLayer.bounds = CGRect(origin: .zero, size: bounds.size)
+        fillLayer.position = CGPoint(x: bounds.minX, y: bounds.midY)
+        CATransaction.commit()
+    }
+
+    func show(fraction: Double, remaining: TimeInterval, step: Int, gliding: Bool) {
+        // A new step, or this one resumed, glides again from where it stands; ticks in between change nothing.
+        let restart = gliding && (!self.gliding || step != self.step)
+        let redraw = gliding != self.gliding || (!gliding && fraction != self.fraction)
+        self.fraction = fraction
+        self.step = step
+        self.gliding = gliding
+        guard restart || redraw else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        trackLayer.isHidden = !gliding
+        fillLayer.isHidden = !gliding
+        if restart {
+            fillLayer.transform = CATransform3DMakeScale(0, 1, 1)   // Where the glide ends.
+            let countdown = CABasicAnimation(keyPath: "transform.scale.x")
+            countdown.fromValue = fraction
+            countdown.toValue = 0
+            countdown.duration = max(remaining, 0.01)
+            fillLayer.add(countdown, forKey: "countdown")
+        } else if !gliding {
+            fillLayer.removeAnimation(forKey: "countdown")
+        }
+        CATransaction.commit()
+        if redraw { needsDisplay = true }
+    }
+
+    // Still, the bar is drawn like any view, so offscreen renders (the README screenshots) include it.
+    override func draw(_ dirtyRect: NSRect) {
+        guard !gliding else { return }
+        Self.trackColor.setFill()
+        bounds.fill(using: .sourceOver)
+        Self.fillColor.setFill()
+        NSRect(x: bounds.minX, y: bounds.minY, width: bounds.width * fraction, height: bounds.height)
+            .fill(using: .sourceOver)
     }
 }
 

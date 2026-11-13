@@ -78,6 +78,19 @@ final class SessionEngineTests {
         Check.equal(engine.remainingSeconds, 60)
     }
 
+    func testProgressIsTheShareOfTheStepPracticed() {
+        var engine = stageEngine()
+        engine.begin(configuration(), at: 0)
+        Check.equal(engine.progress, 0)
+        engine.tick(at: 15)
+        Check.equal(engine.progress, 0.25)
+        engine.pause(at: 30)
+        Check.equal(engine.progress, 0.5)
+        engine.resume(at: 100)
+        engine.nextStage(at: 100)
+        Check.equal(engine.progress, 0)
+    }
+
     func testStageFiveCountsCycleAndFinalManualAdvanceCompletes() {
         var engine = stageEngine()
         engine.begin(configuration(3), at: 0)
