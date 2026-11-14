@@ -5,6 +5,18 @@ extension TimingMode {
     var title: String { self == .perStep ? "Time per step" : "Total time" }
 }
 
+/// Selects the whole value of the field that just gained focus, by a click or Tab, so typing replaces it.
+/// A click puts the insertion point under the pointer while AppKit tracks the mouse, so the selection
+/// waits for that to finish: a timer in the default run-loop mode doesn't fire during the tracking.
+@MainActor private func selectWholeValueOfFocusedField() {
+    RunLoop.main.add(Timer(timeInterval: 0, repeats: false) { _ in
+        MainActor.assumeIsolated {
+            guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isFieldEditor else { return }
+            editor.selectAll(nil)
+        }
+    }, forMode: .default)
+}
+
 struct SetupPanel: View {
     @ObservedObject var model: SessionModel
     let compact: Bool
@@ -120,6 +132,7 @@ private struct DurationInput: View {
                     .accessibilityIdentifier("step-duration-error")
             }
         }
+        .onChange(of: focused) { if $0 != nil { selectWholeValueOfFocusedField() } }
     }
 
     /// A drop-down in place of the field's title: choose time per step, or a total for all cycles.
@@ -204,6 +217,7 @@ private struct NumberInput: View {
                     .accessibilityIdentifier("\(identifier)-error")
             }
         }
+        .onChange(of: focused) { if $0 { selectWholeValueOfFocusedField() } }
     }
 
     private func adjustmentButton(_ symbol: String, by delta: Int) -> some View {

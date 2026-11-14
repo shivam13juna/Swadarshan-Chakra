@@ -68,7 +68,7 @@ No Mac, or nothing to install? The same practice runs in any modern browser at *
 2. Open the zip and drag **Swadarshan Chakra** into your **Applications** folder.
 3. Open it. The first time, macOS says it can't verify the app, because it isn't notarized by Apple. Click **Done**, open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**. You only need to do this once.
 
-Swadarshan Chakra lives in your **menu bar** as a small gold chakra. Click it to open the meditation; right-click it to quit.
+Swadarshan Chakra opens on its setup screen, with a small gold chakra in your **menu bar** while it runs. Closing the window (the **×** at the top right, or <kbd>⌘</kbd> <kbd>W</kbd>) quits it, and it opens on the setup screen again next time.
 
 > [!NOTE]
 > On an Intel Mac, build the app from source. See [For developers](#for-developers).
@@ -86,7 +86,7 @@ Swadarshan Chakra lives in your **menu bar** as a small gold chakra. Click it to
 - **Time per step** gives every form the time you enter.<br>*1 minute per step → 5 minutes per cycle.*
 - **Total time** is the time you have for the whole practice, shared equally by every step.<br>*10 minutes for 3 cycles → 40 seconds per step.*
 
-The panel shows what your choice works out to. Press **Begin meditation** (or <kbd>Return</kbd>). Your settings are remembered for next time.
+Clicking a field selects its whole value, so you can type the new one straight away. The panel shows what your choice works out to. Press **Begin meditation** (or <kbd>Return</kbd>). Your settings are remembered for next time.
 
 <br clear="right">
 
@@ -98,7 +98,8 @@ Each step fills your screen, as in [the five steps](#the-five-steps) above.
 - A thin white bar along the bottom edge shows how much of the step's time is left. It is full as the step begins, empties as the time runs out, and holds still while paused.
 - When a step's time is up, the next one begins by itself. Ready sooner? Press <kbd>Space</kbd>.
 - <kbd>Esc</kbd> pauses. From there you can resume, restart, or end the practice.
-- If you switch to another app, close the window, or your Mac goes to sleep, the practice pauses and waits for you. Nothing moves on while you're away.
+- Closing the window asks first, then ends the practice and quits.
+- If you switch to another app or your Mac goes to sleep, the practice pauses and waits for you. Nothing moves on while you're away.
 
 ![The practice paused in the second cycle, with Resume, Restart, and End in the bottom-right corner](docs/screenshots/paused.jpg)
 
@@ -131,8 +132,7 @@ You can also switch at any time, as in any Mac app: click the green window butto
 | <kbd>⌘</kbd> <kbd>Return</kbd> | Confirm restart, end, or quit |
 | <kbd>⌃</kbd> <kbd>⌘</kbd> <kbd>F</kbd> | Enter or leave full screen |
 | <kbd>⌘</kbd> <kbd>M</kbd> | Minimize, in a window |
-| <kbd>⌘</kbd> <kbd>W</kbd> | Close to the menu bar; your practice pauses and waits |
-| <kbd>⌘</kbd> <kbd>Q</kbd> | Quit (asks first if a practice is under way) |
+| <kbd>⌘</kbd> <kbd>W</kbd> / <kbd>⌘</kbd> <kbd>Q</kbd> | Close and quit (asks first if a practice is under way) |
 
 Holding <kbd>Space</kbd> down never skips more than one step.
 
@@ -183,7 +183,7 @@ Either workflow can also be run by hand from the Actions tab. Removing the Mac a
 |---|---|
 | `Sources/MeditationCore` | Settings, the five forms, and the session state machine: timing, cycles, pause, and Space |
 | `Sources/SwadarshanChakra` | The macOS app: the menu bar item, the window and full screen, and the SwiftUI screens |
-| `Tests/MeditationCoreTests` | 37 deterministic checks that run without Xcode |
+| `Tests/MeditationCoreTests` | 38 deterministic checks that run without Xcode |
 | `web` | The web version, published to [swadarshan-chakra.web.app](https://swadarshan-chakra.web.app) |
 | `Tests/web` | Node checks for the web version's engine |
 | `docs` | The screenshots and icon this README uses |

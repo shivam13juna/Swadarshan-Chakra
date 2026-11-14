@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // One meditation window; keep tab-bar items out of the View menu.
         NSWindow.allowsAutomaticWindowTabbing = false
         model.hideWindow = { [weak self] in self?.hideMeditation() }
+        model.closeWindow = { [weak self] in self?.requestQuit() }
         model.quitApplication = { [weak self] in self?.quitting = true; NSApp.terminate(nil) }
         configureStatusItem()
         configureApplicationMenu()
@@ -113,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "Open Meditation", action: #selector(showMeditation), keyEquivalent: "o").target = self
-        appMenu.addItem(withTitle: "Hide Meditation", action: #selector(hideMeditation), keyEquivalent: "w").target = self
+        appMenu.addItem(withTitle: "Close Meditation", action: #selector(requestQuit), keyEquivalent: "w").target = self
         appMenu.addItem(withTitle: "Hide Swadarshan Chakra", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h").target = NSApp
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Swadarshan Chakra", action: #selector(requestQuit), keyEquivalent: "q").target = self
@@ -169,7 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if opening { fullScreenOnOpen = model.opensInFullScreen }
         wantsMeditationVisible = true
         // Own activation and the full-screen Space while a window is open, just like
-        // a normal Mac app. Return to a menu-bar-only utility after closing it.
+        // a normal Mac app. Return to a menu-bar-only utility after hiding it.
         if NSApp.activationPolicy() != .regular { NSApp.setActivationPolicy(.regular) }
         let window: MeditationWindow
         if let existing = self.window {
@@ -268,8 +269,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func windowWillExitFullScreen(_ notification: Notification) {
-        // Closing exits through hideMeditation, which has already let the window go. Any other exit
-        // (the green button, View ▸ Exit Full Screen, ⌃⌘F) keeps practicing in an ordinary window.
+        // Hiding (Esc on setup or completion) exits through hideMeditation, which has already let the
+        // window go. Any other exit (the green button, View ▸ Exit Full Screen, ⌃⌘F) keeps practicing
+        // in an ordinary window.
         fullScreenTransition = .exiting
     }
 
@@ -321,7 +323,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         showMeditation()
         return true
     }
-    func windowShouldClose(_ sender: NSWindow) -> Bool { hideMeditation(); return false }
+    /// The red window button quits, like ⌘W and the × on the setup and completion screens, so the next
+    /// launch opens on setup. While a practice is under way it asks first, as Quit does.
+    func windowShouldClose(_ sender: NSWindow) -> Bool { requestQuit(); return false }
     /// Covered completely, minimized, or on another Space: nothing on screen needs to move.
     func windowDidChangeOcclusionState(_ notification: Notification) {
         model?.windowVisible = wantsMeditationVisible && window?.occlusionState.contains(.visible) == true
@@ -633,15 +637,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 try await settle()
                 try require(model.engine.phase == .paused && model.engine.stageIndex == 1,
                             "Space stays inactive while paused")
-                hideMeditation()
-                try await awaitHidden()
-                try require(window?.isVisible == false, "Close hides the window")
-                try require(NSApp.activationPolicy() == .accessory, "Closing restores the menu-bar-only utility")
-                statusItem.button?.performClick(nil)
-                try await awaitFullScreen()
-                try require(window?.isVisible == true && model.engine.phase == .paused,
-                            "Menu bar reopens the paused session in native full screen")
-                try require(model.engine.remainingSeconds == remaining, "Close and reopen preserve exact remaining time")
+                // The red window button and ⌘W quit; during a practice they ask first, as Quit does.
+                window?.performClose(nil)
+                try await settle()
+                try require(model.engine.phase == .confirming && model.engine.pendingConfirmation == .quit
+                            && window?.isVisible == true, "Closing during a practice asks before ending it and quitting")
+                key(53, "\u{1b}")
+                try await settle()
+                try require(model.engine.phase == .paused && model.engine.remainingSeconds == remaining,
+                            "Keeping the practice after closing preserves exact remaining time")
                 model.resume()
                 try require(model.engine.phase == .running, "Resume restores running state")
                 NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.willSleepNotification, object: nil)
@@ -702,14 +706,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 try await awaitFullScreen()
                 try require(model.engine.phase == .ready && window?.isVisible == true,
                             "Reopening during a full-screen exit restores the window")
+                // Esc on setup only hides the window; the menu bar brings it back.
+                key(53, "\u{1b}")
+                try await awaitHidden()
+                try require(NSApp.activationPolicy() == .accessory, "Esc on setup leaves the menu-bar-only utility")
+                statusItem.button?.performClick(nil)
+                try await awaitFullScreen()
+                try require(window?.isVisible == true && model.engine.phase == .ready,
+                            "The menu bar reopens setup in native full screen")
+                // A click into a setup field selects its whole value, so typing replaces it.
+                model.cyclesText = "12"
+                try await settle()
+                @MainActor func textFields(in view: NSView) -> [NSTextField] {
+                    ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(textFields)
+                }
+                guard let window, let content = window.contentView,
+                      let field = textFields(in: content).first(where: { $0.isEditable && $0.stringValue == "12" }) else {
+                    throw NSError(domain: "SmokeTest", code: 5, userInfo: [NSLocalizedDescriptionKey: "The cycles field was not found"])
+                }
+                let center = field.convert(NSPoint(x: field.bounds.midX, y: field.bounds.midY), to: nil)
+                for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                    if let click = NSEvent.mouseEvent(with: type, location: center, modifierFlags: [], timestamp: SessionModel.now,
+                                                      windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                      clickCount: 1, pressure: 1) {
+                        NSApp.postEvent(click, atStart: false)
+                    }
+                }
+                try await settle(300)
+                let editor = window.firstResponder as? NSTextView
+                try require(editor?.string == "12" && editor?.selectedRange() == NSRange(location: 0, length: 2),
+                            "Clicking into a setup field selects its whole value")
+                window.makeFirstResponder(content)
                 hideMeditation()
                 try await awaitHidden()
 
                 try await verifyLiveTimer()
-                print("Native smoke test passed.")
                 UserDefaults.standard.removePersistentDomain(forName: "com.swadarshan.chakra.smoke")
-                quitting = true
-                NSApp.terminate(nil)
+                print("Native smoke test passed; closing from setup now quits.")
+                fflush(stdout)
+                // The × on setup quits at once, which ends this run with status 0.
+                model.closeWindow()
+                fputs("Native smoke test failed: closing from setup did not quit\n", stderr)
+                exit(1)
             } catch {
                 fputs("Native smoke test failed: \(error.localizedDescription)\n", stderr)
                 UserDefaults.standard.removePersistentDomain(forName: "com.swadarshan.chakra.smoke")

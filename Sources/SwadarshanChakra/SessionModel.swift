@@ -19,7 +19,10 @@ final class SessionModel: NSObject, ObservableObject {
     /// Whether any of the meditation window is on screen. Decorative motion runs only while it is.
     @Published var windowVisible = false
 
+    /// Esc on the setup or completion screen: puts the window away, leaving the app in the menu bar.
     var hideWindow: () -> Void = {}
+    /// The × button, like the red window button and ⌘W: quits, asking first while a practice is under way.
+    var closeWindow: () -> Void = {}
     var quitApplication: () -> Void = {}
     private var timer: Timer?
     private let defaults: UserDefaults

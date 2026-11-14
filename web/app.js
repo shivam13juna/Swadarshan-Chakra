@@ -678,6 +678,17 @@ cyclesInput.addEventListener("input", () => { model.cyclesText = cyclesInput.val
 minutesInput.addEventListener("input", () => { model.minutesText = minutesInput.value; renderSetup(); });
 secondsInput.addEventListener("input", () => { model.secondsText = secondsInput.value; renderSetup(); });
 
+// A click into a field selects its whole value, so typing replaces it (SetupPanel's selectWholeValueOfFocusedField).
+// Tab already selects it; a click in a field that is already being edited still places the insertion point.
+for (const input of [cyclesInput, minutesInput, secondsInput]) {
+  let focusing = false;
+  input.addEventListener("pointerdown", () => { focusing = document.activeElement !== input; });
+  input.addEventListener("click", () => {
+    if (focusing) input.setSelectionRange(0, input.value.length);
+    focusing = false;
+  });
+}
+
 timingSelect.addEventListener("change", () => {
   setTimingMode(timingSelect.value);
   syncInputs();
