@@ -37,13 +37,13 @@ struct CycleIntroductionView: View {
                     HStack(alignment: .top) {
                         CycleCounter(engine: model.engine).fixedSize()
                         Spacer()
-                        Button(action: model.hideWindow) {
+                        Button(action: model.close) {
                             Image(systemName: "xmark").font(.system(size: 13, weight: .medium))
                                 .frame(width: 15, height: 17)
                         }
                         .buttonStyle(ArtworkButtonStyle())
-                        .help("Close to menu bar (⌘W). Your practice will pause.")
-                        .accessibilityLabel("Close to menu bar")
+                        .help("End this practice and close to the menu bar (⌘W)")
+                        .accessibilityLabel("End practice and close")
                     }
                     Spacer()
                 }

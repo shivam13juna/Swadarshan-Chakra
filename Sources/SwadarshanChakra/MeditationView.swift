@@ -87,13 +87,13 @@ struct MeditationView: View {
                 Circle().fill(Palette.gold.opacity(0.75)).frame(width: 4, height: 4)
                 Eyebrow(text: statusLabel, color: Palette.muted)
             }.padding(.trailing, compact ? 8 : 18)
-            Button(action: model.closeWindow) {
+            Button(action: model.close) {
                 Image(systemName: "xmark").font(.system(size: 12, weight: .light))
                     .frame(width: 14, height: 16)
             }
             .buttonStyle(QuietButtonStyle())
-            .help("Close and quit (⌘W). Next time, it opens on the setup screen.")
-            .accessibilityLabel("Close and quit")
+            .help("Close to the menu bar (⌘W)")
+            .accessibilityLabel("Close to menu bar")
             .accessibilityIdentifier("close-meditation")
         }.frame(height: compact ? 43 : 51)
     }

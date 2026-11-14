@@ -161,7 +161,7 @@ private struct CompletionFocus: View {
                 Button("Practice again", action: model.practiceAgain).buttonStyle(GoldButtonStyle())
                     .keyboardShortcut(.return, modifiers: [])
                     .accessibilityIdentifier("practice-again")
-                Button("Close", action: model.hideWindow).buttonStyle(QuietButtonStyle())
+                Button("Close", action: model.close).buttonStyle(QuietButtonStyle())
             }
         }
     }

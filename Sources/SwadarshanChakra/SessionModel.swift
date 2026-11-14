@@ -19,10 +19,8 @@ final class SessionModel: NSObject, ObservableObject {
     /// Whether any of the meditation window is on screen. Decorative motion runs only while it is.
     @Published var windowVisible = false
 
-    /// Esc on the setup or completion screen: puts the window away, leaving the app in the menu bar.
+    /// Puts the window away, leaving the app in the menu bar. Closing goes through close() instead.
     var hideWindow: () -> Void = {}
-    /// The × button, like the red window button and ⌘W: quits, asking first while a practice is under way.
-    var closeWindow: () -> Void = {}
     var quitApplication: () -> Void = {}
     private var timer: Timer?
     private let defaults: UserDefaults
@@ -136,11 +134,20 @@ final class SessionModel: NSObject, ObservableObject {
         updateTimer()
     }
 
+    /// Every way of closing the window: the × buttons, Close on the completion screen, the red window
+    /// button, ⌘W, and Esc on setup or completion. Any practice ends at once, without asking, and the app
+    /// stays in the menu bar, which opens the setup screen again.
+    func close() {
+        engine.reset()
+        updateTimer()
+        hideWindow()
+    }
+
     func escape() {
         switch engine.phase {
         case .running: pause()
         case .confirming: cancelConfirmation()
-        case .ready, .complete: hideWindow()
+        case .ready, .complete: close()
         case .paused: break
         }
     }
