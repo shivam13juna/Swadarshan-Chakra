@@ -143,12 +143,14 @@ final class SessionModel: NSObject, ObservableObject {
         hideWindow()
     }
 
+    /// Esc pauses a running practice and, pressed again, resumes it with the same time left, so a step
+    /// can be given longer. It also cancels a confirmation, and on setup or completion it closes.
     func escape() {
         switch engine.phase {
         case .running: pause()
+        case .paused: resume()
         case .confirming: cancelConfirmation()
         case .ready, .complete: close()
-        case .paused: break
         }
     }
 

@@ -97,7 +97,7 @@ Each step fills your screen, as in [the five steps](#the-five-steps) above.
 - The current **cycle** and **step** are in the top-left corner. The form's name and the time remaining are at the bottom.
 - A thin white bar along the bottom edge shows how much of the step's time is left. It is full as the step begins, empties as the time runs out, and holds still while paused.
 - When a step's time is up, the next one begins by itself. Ready sooner? Press <kbd>Space</kbd>.
-- <kbd>Esc</kbd> pauses. From there you can resume, restart, or end the practice.
+- <kbd>Esc</kbd> pauses, and <kbd>Esc</kbd> again carries on, so you can stay longer with a step: its time waits while you're paused. From the pause you can also restart or end the practice.
 - The **×** in the top-right corner (or <kbd>⌘</kbd> <kbd>W</kbd>) ends the practice and closes the window. The chakra in the menu bar opens the setup screen again.
 - If you switch to another app or your Mac goes to sleep, the practice pauses and waits for you. Nothing moves on while you're away.
 
@@ -127,7 +127,7 @@ You can also switch at any time, as in any Mac app: click the green window butto
 |---|---|
 | <kbd>Return</kbd> | Begin · Resume · Practice again |
 | <kbd>Space</kbd> | Next step, or start a cycle right away from its card |
-| <kbd>Esc</kbd> | Pause |
+| <kbd>Esc</kbd> | Pause · Resume |
 | <kbd>⌘</kbd> <kbd>R</kbd> / <kbd>⌘</kbd> <kbd>E</kbd> | Restart / End, while paused (asks first) |
 | <kbd>⌘</kbd> <kbd>Return</kbd> | Confirm restart, end, or quit |
 | <kbd>⌃</kbd> <kbd>⌘</kbd> <kbd>F</kbd> | Enter or leave full screen |

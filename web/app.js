@@ -146,8 +146,10 @@ function practiceAgain() {
   update();
 }
 
+/// Esc pauses a running practice and, pressed again, resumes it with the same time left (SessionModel.escape).
 function escape() {
   if (engine.phase === "running") pause();
+  else if (engine.phase === "paused") resume();
   else if (engine.phase === "confirming") cancelConfirmation();
 }
 
@@ -665,8 +667,9 @@ function fullScreenChanged() {
   const purposeful = leavingFullScreenOnPurpose;
   leavingFullScreenOnPurpose = false;
   // Esc is the pause key. When the browser spends it on leaving full screen, the page never
-  // receives the key, so the exit stands in for it.
-  if (!purposeful && now() - lastEscapeKey > 0.5) escape();
+  // receives the key, so the exit stands in for it, though never to resume: the browser also
+  // leaves full screen in other ways, and a paused practice carries on only when asked.
+  if (!purposeful && now() - lastEscapeKey > 0.5 && engine.phase !== "paused") escape();
 }
 
 document.addEventListener("fullscreenchange", fullScreenChanged);
