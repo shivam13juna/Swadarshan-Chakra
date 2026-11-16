@@ -5,7 +5,7 @@ import MeditationCore
 @MainActor
 final class SessionModel: NSObject, ObservableObject {
     @Published var cyclesText: String
-    /// The minutes and seconds below are per step or for the whole practice, as this says.
+    /// Per step or for the whole practice, as the minutes and seconds are entered, or freestyle, with no timer.
     @Published private(set) var timingMode: TimingMode
     @Published var minutesText: String
     @Published var secondsText: String
@@ -15,6 +15,10 @@ final class SessionModel: NSObject, ObservableObject {
     /// The green window button and ⌃⌘F still switch at any time without changing this.
     @Published var opensInFullScreen: Bool {
         didSet { defaults.set(opensInFullScreen, forKey: "opensInFullScreen") }
+    }
+    /// Whether each step shows the countdown bar along its bottom edge. Freestyle has no countdown to show.
+    @Published var showsCountdownBar: Bool {
+        didSet { defaults.set(showsCountdownBar, forKey: "showsCountdownBar") }
     }
     /// Whether any of the meditation window is on screen. Decorative motion runs only while it is.
     @Published var windowVisible = false
@@ -26,27 +30,39 @@ final class SessionModel: NSObject, ObservableObject {
     private let defaults: UserDefaults
     private let automaticTicks: Bool
     private let maximumUnobservedGap: TimeInterval = 2.5
+    /// How the minutes and seconds are entered: per step or in total. Freestyle leaves them as they
+    /// are, so choosing a timer again brings the same time back.
+    private var fieldTiming: TimingMode
 
     init(defaults: UserDefaults = .standard, automaticTicks: Bool = true, initialEngine: SessionEngine = SessionEngine()) {
         self.defaults = defaults
         self.automaticTicks = automaticTicks
         let saved = initialEngine.phase == .ready ? SessionPreferences.load(from: defaults) : initialEngine.configuration
+        // With freestyle chosen, the time fields still hold the time last entered.
+        let time = saved.isTimed ? saved : SessionPreferences.loadTimed(from: defaults)
         cyclesText = String(saved.cycles)
         timingMode = saved.timing
-        minutesText = String(saved.enteredMinutes)
-        secondsText = String(format: "%02d", saved.enteredSecondsComponent)
+        fieldTiming = time.timing
+        minutesText = String(time.enteredMinutes)
+        secondsText = String(format: "%02d", time.enteredSecondsComponent)
         engine = initialEngine
         opensInFullScreen = defaults.object(forKey: "opensInFullScreen") as? Bool ?? true
+        showsCountdownBar = defaults.object(forKey: "showsCountdownBar") as? Bool ?? true
         super.init()
     }
 
     static var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
     var cycles: Int? { SessionConfiguration.integer(cyclesText, in: SessionConfiguration.cycleRange) }
     var configuration: SessionConfiguration? {
+        guard timingMode == .freestyle else { return enteredTime }
+        return cycles.flatMap { try? SessionConfiguration(freestyleCycles: $0) }
+    }
+    /// The time as the fields hold it, per step or in total, even while freestyle is chosen.
+    private var enteredTime: SessionConfiguration? {
         guard let cycles,
-              let minutes = SessionConfiguration.integer(minutesText, in: SessionConfiguration.minuteRange(for: timingMode)),
+              let minutes = SessionConfiguration.integer(minutesText, in: SessionConfiguration.minuteRange(for: fieldTiming)),
               let seconds = SessionConfiguration.integer(secondsText, in: SessionConfiguration.secondRange) else { return nil }
-        return try? SessionConfiguration(cycles: cycles, timing: timingMode, minutes: minutes, seconds: seconds)
+        return try? SessionConfiguration(cycles: cycles, timing: fieldTiming, minutes: minutes, seconds: seconds)
     }
     var cyclesValid: Bool { cycles != nil }
     var secondsValid: Bool { SessionConfiguration.integer(secondsText, in: SessionConfiguration.secondRange) != nil }
@@ -54,6 +70,7 @@ final class SessionModel: NSObject, ObservableObject {
 
     /// Why the entered time cannot be used, or nil. An invalid cycle count is reported by its own field.
     var durationProblem: String? {
+        guard timingMode != .freestyle else { return nil }
         let minuteRange = SessionConfiguration.minuteRange(for: timingMode)
         guard let minutes = SessionConfiguration.integer(minutesText, in: minuteRange) else {
             return "Enter whole minutes from 0 to \(minuteRange.upperBound)."
@@ -71,21 +88,29 @@ final class SessionModel: NSObject, ObservableObject {
             let minimum = cycles * Stage.all.count
             guard entered < minimum else { return nil }
             return "For \(cycles) \(cycles == 1 ? "cycle" : "cycles"), allow at least \(TimeText.duration(Double(minimum))) (1 sec per step)."
+        case .freestyle:
+            return nil
         }
     }
 
-    /// Switching only changes how the time is entered: the fields are converted so the practice stays the same.
+    /// Switching only changes how the time is entered: the fields are converted so the practice stays the
+    /// same. Freestyle leaves them as they are, so choosing a timer again brings the same time back.
     func setTimingMode(_ mode: TimingMode) {
         guard mode != timingMode else { return }
-        if let converted = configuration?.expressed(as: mode) {
-            minutesText = String(converted.enteredMinutes)
-            secondsText = String(format: "%02d", converted.enteredSecondsComponent)
+        if mode != .freestyle {
+            if mode != fieldTiming, let converted = enteredTime?.expressed(as: mode) {
+                minutesText = String(converted.enteredMinutes)
+                secondsText = String(format: "%02d", converted.enteredSecondsComponent)
+            }
+            fieldTiming = mode
         }
         timingMode = mode
     }
 
     func begin() {
         guard let configuration else { return }
+        // Freestyle saves the time fields too, for when a timer is chosen again.
+        if !configuration.isTimed, let enteredTime { SessionPreferences.save(enteredTime, to: defaults) }
         SessionPreferences.save(configuration, to: defaults)
         engine.begin(configuration, at: Self.now)
         updateTimer()
@@ -103,8 +128,17 @@ final class SessionModel: NSObject, ObservableObject {
 
     func pause(reason: String = "Your practice is paused.", away: Bool = false) {
         pauseReason = reason
-        if away { engine.pauseAtLastSample() }
+        if away { engine.pauseAtLastSample(at: Self.now) }
         else { engine.pause(at: Self.now) }
+        updateTimer()
+    }
+
+    /// Whether the practitioner is with the practice: the window is in front, and the Mac is awake and
+    /// unlocked. Leaving pauses a running practice, and a pause counts as practice only while they're here.
+    func setPresent(_ present: Bool) {
+        let wasActive = engine.phase == .running || engine.phase == .confirming
+        engine.setPresent(present, at: Self.now)
+        if !present && wasActive { pauseReason = "Paused while you were away." }
         updateTimer()
     }
 

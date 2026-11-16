@@ -163,7 +163,7 @@ final class SessionEngineTests {
         Check.equal(engine.stageIndex, 2)
     }
 
-    func testPauseExcludesElapsedAbsenceAndResumesExactly() {
+    func testPauseKeepsTheStepTimeAndResumesExactly() {
         var engine = stageEngine()
         engine.begin(configuration(), at: 0)
         engine.pause(at: 23)
@@ -174,7 +174,50 @@ final class SessionEngineTests {
         engine.resume(at: 400)
         engine.tick(at: 410)
         Check.equal(engine.remainingSeconds, 27)
-        Check.equal(engine.activeSeconds, 33)
+        // The step's own time waited; the pause itself, spent with the step, is practice too.
+        Check.equal(engine.activeSeconds, 410)
+    }
+
+    func testPausedTimeCountsAsPracticeOnlyWhilePresent() {
+        var engine = stageEngine()
+        engine.begin(configuration(), at: 0)
+        engine.pause(at: 10)
+        engine.resume(at: 40)
+        Check.equal(engine.activeSeconds, 40)
+        Check.equal(engine.remainingSeconds, 50)
+        engine.pause(at: 50)
+        engine.setPresent(false, at: 60)
+        Check.isFalse(engine.isPresent)
+        engine.setPresent(true, at: 500)
+        engine.resume(at: 520)
+        // 10 s paused before leaving and 20 s after coming back; the 440 s away never count.
+        Check.equal(engine.activeSeconds, 80)
+        Check.equal(engine.remainingSeconds, 40)
+        // Leaving a running practice pauses it as of the last sample, and nothing counts until they're back.
+        engine.tick(at: 530)
+        engine.setPresent(false, at: 530.1)
+        Check.equal(engine.phase, .paused)
+        engine.setPresent(true, at: 900)
+        engine.resume(at: 905)
+        Check.equal(engine.activeSeconds, 95)
+        Check.equal(engine.remainingSeconds, 30)
+        // A confirmation is not practice.
+        engine.requestConfirmation(.restart, at: 910)
+        engine.cancelConfirmation(at: 950)
+        engine.tick(at: 960)
+        Check.equal(engine.activeSeconds, 110)
+        engine.pause(at: 970)
+        engine.requestConfirmation(.end, at: 980)
+        engine.cancelConfirmation(at: 1000)
+        engine.resume(at: 1010)
+        // 10 s running, 10 s paused, the 20 s question skipped, then 10 s paused.
+        Check.equal(engine.activeSeconds, 140)
+        // Presence outlasts the practice.
+        engine.setPresent(false, at: 1020)
+        engine.reset()
+        Check.isFalse(engine.isPresent)
+        engine.begin(configuration(), at: 1030)
+        Check.isFalse(engine.isPresent)
     }
 
     func testLongUnobservedGapPausesWithoutUnattendedProgress() {
@@ -250,7 +293,7 @@ final class SessionEngineTests {
         var engine = stageEngine()
         engine.begin(configuration(), at: 0)
         engine.requestConfirmation(.end, at: 10)
-        engine.pauseAtLastSample()
+        engine.setPresent(false, at: 50)
         engine.cancelConfirmation(at: 100)
         Check.equal(engine.phase, .paused)
     }
@@ -494,7 +537,8 @@ final class SessionEngineTests {
         Check.isFalse(engine.isIntroducingCycle)
         engine.tick(at: 130)
         Check.equal(engine.remainingSeconds, 30)
-        Check.equal(engine.activeSeconds, 30)
+        // The pause counts as practice (98.5 s); the card never does.
+        Check.equal(engine.activeSeconds, 128.5)
 
         var away = SessionEngine()
         away.begin(configuration(), at: 0)
@@ -532,6 +576,76 @@ final class SessionEngineTests {
         Check.equal(SessionPreferences.load(from: defaults), configuration(108, 1, 30))
         SessionPreferences.save(configuration(4, 2), to: defaults)
         Check.equal(SessionPreferences.load(from: defaults), configuration(4, 2))
+    }
+
+    func testFreestyleHasNoTimer() throws {
+        let free = try SessionConfiguration(freestyleCycles: 3)
+        Check.equal(free.timing, .freestyle)
+        Check.isFalse(free.isTimed)
+        Check.isTrue(configuration().isTimed)
+        Check.isTrue(total(3, 10).isTimed)
+        Check.equal(free.stepCount, 15)
+        Check.equal(free.enteredSeconds, 0)
+        Check.equal(free.secondsPerStage, 0)
+        Check.equal(free.secondsPerCycle, 0)
+        Check.equal(free.plannedSeconds, 0)
+        Check.equal(SessionConfiguration.minuteRange(for: .freestyle), 0...0)
+        Check.throwsError(try SessionConfiguration(freestyleCycles: 0))
+        Check.throwsError(try SessionConfiguration(freestyleCycles: 109))
+        Check.throwsError(try SessionConfiguration(cycles: 1, timing: .freestyle, minutes: 0, seconds: 5))
+        Check.throwsError(try SessionConfiguration(cycles: 1, timing: .freestyle, minutes: 1))
+        // There is no time to carry over either way.
+        Check.equal(configuration(3, 1).expressed(as: .freestyle), free)
+        Check.equal(total(3, 10).expressed(as: .freestyle), free)
+        Check.equal(free.expressed(as: .perStep), free)
+        Check.equal(free.expressed(as: .total), free)
+    }
+
+    func testFreestyleStepsLastUntilThePractitionerMovesOn() {
+        var engine = SessionEngine()
+        engine.begin(try! SessionConfiguration(freestyleCycles: 2), at: 0)
+        // The card that opens each cycle still lasts three seconds.
+        Check.isTrue(engine.isIntroducingCycle)
+        Check.isFalse(engine.tick(at: 2.9))
+        Check.isTrue(engine.tick(at: 3))
+        Check.isFalse(engine.isIntroducingCycle)
+        // A step never ends by itself, however long it is given.
+        Check.isFalse(engine.tick(at: 4000))
+        Check.equal(engine.phase, .running)
+        Check.equal(engine.stageIndex, 0)
+        Check.equal(engine.progress, 0)
+        Check.equal(engine.activeSeconds, 3997)
+        Check.isTrue(engine.nextStage(at: 4010))
+        Check.equal(engine.stageIndex, 1)
+        Check.equal(engine.activeSeconds, 4007)
+        Check.isFalse(engine.nextStage(at: 4010.5, isRepeat: true))
+        for now in [4020.0, 4030, 4040, 4050] { engine.nextStage(at: now) }
+        Check.equal(engine.completedCycles, 1)
+        Check.isTrue(engine.isIntroducingCycle)
+        Check.equal(engine.currentCycle, 2)
+        Check.isTrue(engine.tick(at: 4053))
+        engine.pause(at: 4060)
+        engine.resume(at: 4100)
+        for now in [4110.0, 4120, 4130, 4140, 4150] { engine.nextStage(at: now) }
+        Check.equal(engine.phase, .complete)
+        Check.equal(engine.completedCycles, 2)
+        // 3997 + 50 s in cycle 1, then 7 + 40 paused + 50 s in cycle 2; neither card counts.
+        Check.equal(engine.activeSeconds, 4144)
+    }
+
+    func testFreestylePreferencesKeepTheTimeLastEntered() {
+        let suite = "com.swadarshan.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        SessionPreferences.save(configuration(3, 1, 30), to: defaults)
+        let free = try! SessionConfiguration(freestyleCycles: 2)
+        SessionPreferences.save(free, to: defaults)
+        Check.equal(SessionPreferences.load(from: defaults), free)
+        // The time fields keep the time last entered, for when a timer is chosen again.
+        Check.equal(SessionPreferences.loadTimed(from: defaults), configuration(2, 1, 30))
+        SessionPreferences.save(total(4, 20), to: defaults)
+        Check.equal(SessionPreferences.load(from: defaults), total(4, 20))
+        Check.equal(SessionPreferences.loadTimed(from: defaults), total(4, 20))
     }
 
     func testMissingAndInvalidPreferencesUseSensibleDefaults() {

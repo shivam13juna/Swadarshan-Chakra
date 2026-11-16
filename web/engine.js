@@ -12,9 +12,11 @@ export const STAGES = Object.freeze([
 
 export const stageLabel = (stage) => (stage.context ? `${stage.title} — ${stage.context}` : stage.title);
 
-/// How time is entered: for one step, or for the whole practice, shared equally by every step.
+/// How time is set: for one step, for the whole practice (shared equally by every step), or not at all.
 export const PER_STEP = "perStep";
 export const TOTAL = "total";
+/// No timer: every step lasts until the practitioner moves on.
+export const FREESTYLE = "freestyle";
 
 const within = (value, [low, high]) => Number.isInteger(value) && value >= low && value <= high;
 
@@ -29,11 +31,14 @@ export class SessionConfiguration {
   static maximumTotalSeconds = 36000;
 
   static minuteRange(timing) {
-    return timing === PER_STEP ? [0, 120] : [0, 600];
+    if (timing === PER_STEP) return [0, 120];
+    if (timing === TOTAL) return [0, 600];
+    return [0, 0]; // Freestyle: no time is entered.
   }
 
   constructor(cycles, timing, minutes, seconds = 0) {
     if (!within(cycles, SessionConfiguration.cycleRange)) throw new ValidationError("cycles");
+    if (![PER_STEP, TOTAL, FREESTYLE].includes(timing)) throw new ValidationError("timing");
     if (!within(minutes, SessionConfiguration.minuteRange(timing))) throw new ValidationError("minutes");
     if (!within(seconds, SessionConfiguration.secondRange)) throw new ValidationError("seconds");
     const entered = minutes * 60 + seconds;
@@ -44,14 +49,18 @@ export class SessionConfiguration {
       if (entered < cycles * STAGES.length || entered > SessionConfiguration.maximumTotalSeconds) {
         throw new ValidationError("duration");
       }
-    } else {
-      throw new ValidationError("timing");
+    } else if (entered !== 0) {
+      throw new ValidationError("duration");
     }
     this.cycles = cycles;
     this.timing = timing;
-    /// Whole seconds as entered: one step's time, or the time for all cycles together.
+    /// Whole seconds as entered: one step's time, or the time for all cycles together. None in freestyle.
     this.enteredSeconds = entered;
     Object.freeze(this);
+  }
+
+  static freestyle(cycles) {
+    return new SessionConfiguration(cycles, FREESTYLE, 0, 0);
   }
 
   /// The configuration, or null when the values can't make a practice.
@@ -63,27 +72,35 @@ export class SessionConfiguration {
     }
   }
 
+  /// Whether the steps are timed. In freestyle, a step ends only when the practitioner moves on.
+  get isTimed() { return this.timing !== FREESTYLE; }
   get stepCount() { return this.cycles * STAGES.length; }
   get enteredMinutes() { return Math.floor(this.enteredSeconds / 60); }
   get enteredSecondsComponent() { return this.enteredSeconds % 60; }
 
-  /// Equal for every step. A shared total may divide into fractions of a second.
+  /// Equal for every step. A shared total may divide into fractions of a second. Freestyle plans no time.
   get secondsPerStage() {
-    return this.timing === PER_STEP ? this.enteredSeconds : this.enteredSeconds / this.stepCount;
+    if (this.timing === PER_STEP) return this.enteredSeconds;
+    return this.timing === TOTAL ? this.enteredSeconds / this.stepCount : 0;
   }
 
   get secondsPerCycle() {
-    return this.timing === PER_STEP ? this.secondsPerStage * STAGES.length : this.enteredSeconds / this.cycles;
+    if (this.timing === PER_STEP) return this.secondsPerStage * STAGES.length;
+    return this.timing === TOTAL ? this.enteredSeconds / this.cycles : 0;
   }
 
   get plannedSeconds() {
-    return this.timing === PER_STEP ? this.enteredSeconds * this.stepCount : this.enteredSeconds;
+    if (this.timing === PER_STEP) return this.enteredSeconds * this.stepCount;
+    return this.timing === TOTAL ? this.enteredSeconds : 0;
   }
 
   /// The same practice, entered the other way. A total that does not divide evenly rounds each
   /// step to the nearest second; a per-step practice longer than ten hours becomes the ten-hour total.
+  /// Freestyle has no time to carry over: as freestyle a practice keeps only its cycles, and a
+  /// freestyle practice stays as it is.
   expressed(timing) {
-    if (timing === this.timing) return this;
+    if (timing === this.timing || !this.isTimed) return this;
+    if (timing === FREESTYLE) return SessionConfiguration.freestyle(this.cycles);
     const seconds = timing === TOTAL
       ? Math.min(this.enteredSeconds * this.stepCount, SessionConfiguration.maximumTotalSeconds)
       : Math.max(1, Math.round(this.secondsPerStage));
@@ -149,6 +166,9 @@ export class SessionEngine {
 
   constructor(introductionDuration = SessionEngine.standardIntroduction) {
     this.introductionDuration = Math.max(0, introductionDuration);
+    /// Whether the practitioner is with the practice: the page is in front and has focus. It outlasts
+    /// any one practice; see setPresent.
+    this.isPresent = true;
     this.reset();
   }
 
@@ -160,6 +180,8 @@ export class SessionEngine {
     this.completedCycles = 0;
     this.remainingSeconds = 60;
     this.introductionRemaining = 0;
+    /// The time practiced: every running step, and every pause spent with the practice (isPresent).
+    /// Cycle cards, confirmations, and time away never count.
     this.activeSeconds = 0;
     /// "restart", "end", or null.
     this.pendingConfirmation = null;
@@ -168,13 +190,16 @@ export class SessionEngine {
     this.stageStartedAt = 0;
     this.lastAutomaticTransition = null;
     this.resumeOnCancel = false;
+    /// While paused with the practitioner present, the moment from which the pause is not yet counted.
+    this.pausedSince = null;
   }
 
   get currentStage() { return STAGES[this.stageIndex]; }
   get currentCycle() { return Math.min(this.completedCycles + 1, this.configuration.cycles); }
   get isIntroducingCycle() { return this.phase === "running" && this.introductionRemaining > 0; }
-  /// The share of this step's time already practiced, from 0 to 1.
+  /// The share of this step's time already practiced, from 0 to 1. A freestyle step has no time to share.
   get progress() {
+    if (!this.configuration.isTimed) return 0;
     return Math.min(1, Math.max(0, 1 - this.remainingSeconds / this.configuration.secondsPerStage));
   }
 
@@ -193,7 +218,7 @@ export class SessionEngine {
   tick(now, maximumGap = null) {
     if (this.phase !== "running") return false;
     if (maximumGap != null && now - this.lastSample > maximumGap) {
-      this.pauseAtLastSample();
+      this.pauseAtLastSample(now);
       return false;
     }
     if (this.introductionRemaining > 0) {
@@ -205,7 +230,8 @@ export class SessionEngine {
       return true;
     }
     this.#accrue(now);
-    if (this.remainingSeconds <= 0) {
+    // A freestyle step never ends by itself.
+    if (this.configuration.isTimed && this.remainingSeconds <= 0) {
       this.#advance(now, true);
       return true;
     }
@@ -245,18 +271,41 @@ export class SessionEngine {
       this.#accrue(now);
     }
     this.phase = "paused";
+    // Time paused with a step is practice too, while the practitioner is here.
+    this.pausedSince = this.isPresent ? now : null;
   }
 
-  pauseAtLastSample() {
+  /// Pauses as of the last sample, for an absence noticed only now: the time since that sample never
+  /// counts. Paused time counts from now while the practitioner is here.
+  pauseAtLastSample(now) {
     if (this.phase === "confirming") this.resumeOnCancel = false;
     if (this.phase === "running") {
       this.introductionRemaining = 0;
       this.phase = "paused";
+      this.pausedSince = this.isPresent ? now : null;
+    }
+  }
+
+  /// The practitioner has left the practice or come back to it: the page lost or regained focus, or
+  /// was hidden or shown. Leaving pauses a running practice as of its last sample. A pause counts as
+  /// practice only while they are here.
+  setPresent(present, now) {
+    if (present === this.isPresent) return;
+    if (present) {
+      this.isPresent = true;
+      if (this.phase === "paused") this.pausedSince = now;
+    } else {
+      this.#countPause(now);
+      this.pausedSince = null;
+      this.isPresent = false;
+      this.pauseAtLastSample(now);
     }
   }
 
   resume(now) {
     if (this.phase !== "paused") return;
+    this.#countPause(now);
+    this.pausedSince = null;
     this.lastSample = now;
     // Reject events queued while the page was hidden or the session was paused.
     this.stageStartedAt = now;
@@ -268,6 +317,9 @@ export class SessionEngine {
     if (this.phase !== "running" && this.phase !== "paused") return;
     const wasRunning = this.phase === "running";
     this.pause(now);
+    // The question is not practice: the pause stops counting while it is asked.
+    this.#countPause(now);
+    this.pausedSince = null;
     this.resumeOnCancel = wasRunning;
     this.pendingConfirmation = action;
     this.phase = "confirming";
@@ -279,6 +331,7 @@ export class SessionEngine {
     this.pendingConfirmation = null;
     this.resumeOnCancel = false;
     this.phase = "paused";
+    this.pausedSince = this.isPresent ? now : null;
     if (shouldResume) this.resume(now);
   }
 
@@ -296,10 +349,17 @@ export class SessionEngine {
 
   #accrue(now) {
     const delta = Math.max(0, now - this.lastSample);
-    const practiced = Math.min(this.remainingSeconds, delta);
+    // A timed step counts only up to its end; a freestyle step lasts as long as it is given.
+    const practiced = this.configuration.isTimed ? Math.min(this.remainingSeconds, delta) : delta;
     this.activeSeconds += practiced;
     this.remainingSeconds = Math.max(0, this.remainingSeconds - practiced);
     this.lastSample = Math.max(this.lastSample, now);
+  }
+
+  #countPause(now) {
+    if (this.pausedSince == null) return;
+    this.activeSeconds += Math.max(0, now - this.pausedSince);
+    this.pausedSince = Math.max(this.pausedSince, now);
   }
 
   #advance(now, automatic) {
@@ -327,8 +387,14 @@ export class SessionEngine {
   }
 }
 
-/// Saved settings. `read(key)` returns a string or null.
+/// The practice last begun: freestyle, or timed as last entered. `read(key)` returns a string or null.
 export function loadPreferences(read) {
+  const timed = loadTimedPreferences(read);
+  return read("freestyle") === "true" ? SessionConfiguration.freestyle(timed.cycles) : timed;
+}
+
+/// The time last entered, per step or in total. Freestyle keeps it for when a timer is chosen again.
+export function loadTimedPreferences(read) {
   const integer = (key) => {
     const value = Number.parseInt(read(key) ?? "", 10);
     return Number.isFinite(value) ? value : 0;
@@ -347,9 +413,11 @@ export function loadPreferences(read) {
   return new SessionConfiguration(cycles, PER_STEP, Math.floor(duration / 60), duration % 60);
 }
 
-/// `write(key, value)` stores one setting.
+/// `write(key, value)` stores one setting. Freestyle saves its cycles and leaves the time last entered as it is.
 export function savePreferences(configuration, write) {
   write("cycles", String(configuration.cycles));
+  write("freestyle", String(!configuration.isTimed));
+  if (!configuration.isTimed) return;
   write("timingMode", configuration.timing);
   write(configuration.timing === PER_STEP ? "stepDurationSeconds" : "totalDurationSeconds",
     String(configuration.enteredSeconds));

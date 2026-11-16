@@ -1,7 +1,7 @@
 // Checks that web/engine.js behaves like MeditationCore. Run: node Tests/web/engine-checks.mjs
 import {
-  STAGES, PER_STEP, TOTAL, SessionConfiguration as Config, SessionEngine, TimeText,
-  loadPreferences, savePreferences,
+  STAGES, PER_STEP, TOTAL, FREESTYLE, SessionConfiguration as Config, SessionEngine, TimeText,
+  loadPreferences, loadTimedPreferences, savePreferences,
 } from "../../web/engine.js";
 
 let checks = 0;
@@ -243,9 +243,97 @@ check("absence during a confirmation stays paused after cancelling", () => {
   engine.begin(perStep(1, 1), 0);
   engine.tick(0);
   engine.requestConfirmation("end", 5);
-  engine.pauseAtLastSample();
+  engine.setPresent(false, 7);
   engine.cancelConfirmation(9);
   equal(engine.phase, "paused", "paused");
+});
+
+check("a pause counts as practice only while the practitioner is here", () => {
+  const engine = stageEngine();
+  engine.begin(perStep(1, 1), 0);
+  engine.pause(10);
+  engine.resume(40);
+  equal(engine.activeSeconds, 40, "30 s paused with the step");
+  equal(engine.remainingSeconds, 50, "the step's own time waited");
+  engine.pause(50);
+  engine.setPresent(false, 60);
+  equal(engine.isPresent, false, "away");
+  engine.setPresent(true, 500);
+  engine.resume(520);
+  equal(engine.activeSeconds, 80, "time away never counts");
+  engine.tick(530);
+  engine.setPresent(false, 530.1);
+  equal(engine.phase, "paused", "leaving pauses a running practice");
+  engine.setPresent(true, 900);
+  engine.resume(905);
+  equal(engine.activeSeconds, 95, "nothing counted until back");
+  engine.requestConfirmation("restart", 910);
+  engine.cancelConfirmation(950);
+  engine.tick(960);
+  equal(engine.activeSeconds, 110, "a confirmation is not practice");
+  engine.pause(970);
+  engine.requestConfirmation("end", 980);
+  engine.cancelConfirmation(1000);
+  engine.resume(1010);
+  equal(engine.activeSeconds, 140, "paused either side of the question");
+  engine.setPresent(false, 1020);
+  engine.reset();
+  engine.begin(perStep(1, 1), 1030);
+  equal(engine.isPresent, false, "presence outlasts the practice");
+});
+
+check("freestyle has no timer", () => {
+  const free = Config.freestyle(3);
+  equal(free.timing, FREESTYLE, "timing");
+  equal(free.isTimed, false, "untimed");
+  equal(perStep(1, 1).isTimed, true, "per step is timed");
+  equal(free.stepCount, 15, "steps");
+  equal(free.secondsPerStage, 0, "per step");
+  equal(free.plannedSeconds, 0, "planned");
+  equal(Config.minuteRange(FREESTYLE)[1], 0, "no minutes");
+  equal(Config.make(0, FREESTYLE, 0), null, "zero cycles");
+  equal(Config.make(1, FREESTYLE, 0, 5), null, "no time allowed");
+  equal(Config.make(1, "other", 1), null, "unknown timing");
+  equal(perStep(3, 1).expressed(FREESTYLE).timing, FREESTYLE, "to freestyle");
+  equal(perStep(3, 1).expressed(FREESTYLE).cycles, 3, "keeps cycles");
+  equal(free.expressed(PER_STEP), free, "stays freestyle");
+});
+
+check("a freestyle step lasts until the practitioner moves on", () => {
+  const engine = new SessionEngine();
+  engine.begin(Config.freestyle(2), 0);
+  equal(engine.tick(2.9), false, "card still showing");
+  equal(engine.tick(3), true, "card ends after three seconds");
+  equal(engine.tick(4000), false, "a step never ends by itself");
+  equal(engine.stageIndex, 0, "still step 1");
+  equal(engine.progress, 0, "no progress to show");
+  equal(engine.activeSeconds, 3997, "all of it practiced");
+  equal(engine.nextStage(4010), true, "Space moves on");
+  equal(engine.stageIndex, 1, "step 2");
+  for (const time of [4020, 4030, 4040, 4050]) engine.nextStage(time);
+  equal(engine.isIntroducingCycle, true, "cycle 2 card");
+  engine.tick(4053);
+  engine.pause(4060);
+  engine.resume(4100);
+  for (const time of [4110, 4120, 4130, 4140, 4150]) engine.nextStage(time);
+  equal(engine.phase, "complete", "complete");
+  equal(engine.activeSeconds, 4144, "practiced, with the pause");
+});
+
+check("freestyle keeps the time last entered", () => {
+  const stored = new Map();
+  const write = (key, value) => stored.set(key, value);
+  const read = (key) => stored.get(key) ?? null;
+  savePreferences(perStep(3, 1, 30), write);
+  savePreferences(Config.freestyle(2), write);
+  const loaded = loadPreferences(read);
+  equal(loaded.timing, FREESTYLE, "freestyle");
+  equal(loaded.cycles, 2, "cycles");
+  const timed = loadTimedPreferences(read);
+  equal(timed.timing, PER_STEP, "time kept");
+  equal(timed.enteredSeconds, 90, "1:30 per step");
+  savePreferences(total(4, 20), write);
+  equal(loadPreferences(read).timing, TOTAL, "a timer again");
 });
 
 check("saved settings", () => {

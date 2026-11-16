@@ -2,8 +2,8 @@
 // MeditationCore); this file mirrors the Mac app's SessionModel, its SwiftUI views, and
 // AppMain's keyboard and lifecycle handling.
 import {
-  STAGES, stageLabel, PER_STEP, SessionConfiguration, SessionEngine, TimeText,
-  loadPreferences, savePreferences,
+  STAGES, stageLabel, PER_STEP, TOTAL, FREESTYLE, SessionConfiguration, SessionEngine, TimeText,
+  loadPreferences, loadTimedPreferences, savePreferences,
 } from "./engine.js";
 
 const MAXIMUM_UNOBSERVED_GAP = 2.5;
@@ -41,28 +41,44 @@ const storage = {
 
 const engine = new SessionEngine();
 const saved = loadPreferences(storage.read);
+// With freestyle chosen, the time fields still hold the time last entered.
+const savedTime = saved.isTimed ? saved : loadTimedPreferences(storage.read);
 const model = {
   cyclesText: String(saved.cycles),
+  /// Per step or for the whole practice, as the minutes and seconds are entered, or freestyle, with no timer.
   timingMode: saved.timing,
-  minutesText: String(saved.enteredMinutes),
-  secondsText: pad2(saved.enteredSecondsComponent),
+  /// How the minutes and seconds are entered: per step or in total. Freestyle leaves them as they are,
+  /// so choosing a timer again brings the same time back.
+  fieldTiming: savedTime.timing,
+  minutesText: String(savedTime.enteredMinutes),
+  secondsText: pad2(savedTime.enteredSecondsComponent),
   pauseReason: PAUSED,
   opensInFullScreen: storage.read("opensInFullScreen") !== "false",
+  /// Whether each step shows the countdown bar along its bottom edge. Freestyle has no countdown to show.
+  showsCountdownBar: storage.read("showsCountdownBar") !== "false",
 };
 
 const cycles = () => SessionConfiguration.integer(model.cyclesText, SessionConfiguration.cycleRange);
 const cycleTitle = () => `Cycle ${engine.currentCycle} of ${engine.configuration.cycles}`;
 
 function configuration() {
+  if (model.timingMode !== FREESTYLE) return enteredTime();
   const cycleCount = cycles();
-  const minutes = SessionConfiguration.integer(model.minutesText, SessionConfiguration.minuteRange(model.timingMode));
+  return cycleCount == null ? null : SessionConfiguration.freestyle(cycleCount);
+}
+
+/// The time as the fields hold it, per step or in total, even while freestyle is chosen.
+function enteredTime() {
+  const cycleCount = cycles();
+  const minutes = SessionConfiguration.integer(model.minutesText, SessionConfiguration.minuteRange(model.fieldTiming));
   const seconds = SessionConfiguration.integer(model.secondsText, SessionConfiguration.secondRange);
   if (cycleCount == null || minutes == null || seconds == null) return null;
-  return SessionConfiguration.make(cycleCount, model.timingMode, minutes, seconds);
+  return SessionConfiguration.make(cycleCount, model.fieldTiming, minutes, seconds);
 }
 
 /// Why the entered time cannot be used, or null. An invalid cycle count is reported by its own field.
 function durationProblem() {
+  if (model.timingMode === FREESTYLE) return null;
   const minuteRange = SessionConfiguration.minuteRange(model.timingMode);
   const minutes = SessionConfiguration.integer(model.minutesText, minuteRange);
   if (minutes == null) return `Enter whole minutes from 0 to ${minuteRange[1]}.`;
@@ -81,13 +97,17 @@ function durationProblem() {
   return `For ${cycleCount} ${cycleCount === 1 ? "cycle" : "cycles"}, allow at least ${TimeText.duration(minimum)} (1 sec per step).`;
 }
 
-/// Switching only changes how the time is entered: the fields are converted so the practice stays the same.
+/// Switching only changes how the time is entered: the fields are converted so the practice stays the
+/// same. Freestyle leaves them as they are, so choosing a timer again brings the same time back.
 function setTimingMode(mode) {
   if (mode === model.timingMode) return;
-  const converted = configuration()?.expressed(mode);
-  if (converted) {
-    model.minutesText = String(converted.enteredMinutes);
-    model.secondsText = pad2(converted.enteredSecondsComponent);
+  if (mode !== FREESTYLE) {
+    const converted = mode === model.fieldTiming ? null : enteredTime()?.expressed(mode);
+    if (converted) {
+      model.minutesText = String(converted.enteredMinutes);
+      model.secondsText = pad2(converted.enteredSecondsComponent);
+    }
+    model.fieldTiming = mode;
   }
   model.timingMode = mode;
 }
@@ -97,6 +117,9 @@ function setTimingMode(mode) {
 function begin() {
   const chosen = configuration();
   if (!chosen || engine.phase !== "ready") return;
+  // Freestyle saves the time fields too, for when a timer is chosen again.
+  const time = chosen.isTimed ? null : enteredTime();
+  if (time) savePreferences(time, storage.write);
   savePreferences(chosen, storage.write);
   preloadArtwork();
   if (model.opensInFullScreen) enterFullScreen();
@@ -113,11 +136,18 @@ function nextStage(eventTime = now(), isRepeat = false) {
   if (transitioned) announceStage();
 }
 
-function pause(reason = PAUSED, away = false) {
+function pause(reason = PAUSED) {
+  if (engine.phase === "running" || engine.phase === "confirming") model.pauseReason = reason;
+  engine.pause(now());
+  update();
+}
+
+/// Whether the practitioner is with the practice: the page is in front and has focus. Leaving pauses a
+/// running practice, and a pause counts as practice only while they're here (SessionModel.setPresent).
+function setPresent(present) {
   const wasActive = engine.phase === "running" || engine.phase === "confirming";
-  if (away) engine.pauseAtLastSample();
-  else engine.pause(now());
-  if (wasActive) model.pauseReason = reason;
+  engine.setPresent(present, now());
+  if (!present && wasActive) model.pauseReason = AWAY;
   update();
 }
 
@@ -231,6 +261,8 @@ const summary = [1, 2].map((index) => ({ label: byId(`summary-label-${index}`), 
 const beginButton = byId("begin-button");
 const setupNote = byId("setup-note");
 const fullScreenCheckbox = byId("opens-full-screen");
+const countdownBarSetting = byId("countdown-bar-setting");
+const countdownBarCheckbox = byId("shows-countdown-bar");
 
 const cardCycleCounter = byId("card-cycle-counter");
 const cycleChakra = byId("cycle-chakra");
@@ -244,10 +276,12 @@ const pausedLabel = byId("paused-label");
 const stageTitle = byId("stage-title");
 const stageContext = byId("stage-context");
 const remainingTime = byId("remaining-time");
+const metaDivider = byId("meta-divider");
 const cyclesCompleted = byId("cycles-completed");
 const runningControls = byId("running-controls");
 const pausedControls = byId("paused-controls");
 const pauseReason = byId("pause-reason");
+const stepMeter = byId("step-meter");
 const stepMeterFill = byId("step-meter-fill");
 
 const confirmation = byId("confirmation");
@@ -478,8 +512,11 @@ function renderOverview() {
   } else {
     const count = engine.completedCycles;
     setText(byId("completed-cycles"), `${count} ${count === 1 ? "cycle" : "cycles"} completed`);
+    // Practiced includes time paused with a step; freestyle planned no time to compare it with.
     setText(byId("practiced-time"), TimeText.elapsed(engine.activeSeconds));
     setText(byId("planned-time"), TimeText.elapsed(engine.configuration.plannedSeconds));
+    byId("planned-divider").hidden = !engine.configuration.isTimed;
+    byId("planned-summary").hidden = !engine.configuration.isTimed;
     setShortcut("Return", "Practice again");
   }
   layoutOrbit();
@@ -494,11 +531,15 @@ function syncInputs() {
 
 function renderSetup() {
   const perStep = model.timingMode === PER_STEP;
+  const freestyle = model.timingMode === FREESTYLE;
   const cycleCount = cycles();
   cyclesBox.classList.toggle("is-invalid", cycleCount == null);
   cyclesInput.setAttribute("aria-invalid", String(cycleCount == null));
   cyclesError.hidden = cycleCount != null;
 
+  // Freestyle has no time to enter; the fields keep theirs for when a timer is chosen again.
+  durationBox.hidden = freestyle;
+  countdownBarSetting.hidden = freestyle;
   const problem = durationProblem();
   durationBox.classList.toggle("is-invalid", problem != null);
   for (const input of [minutesInput, secondsInput]) input.setAttribute("aria-invalid", String(problem != null));
@@ -506,25 +547,32 @@ function renderSetup() {
   setText(durationError, problem ?? "");
   minutesInput.setAttribute("aria-label", perStep ? "Minutes per step" : "Total minutes");
   secondsInput.setAttribute("aria-label", perStep ? "Additional seconds per step" : "Additional total seconds");
-  let hint = "For each form";
-  if (!perStep) hint = cycleCount == null ? "For all cycles" : cycleCount === 1 ? "For 1 cycle" : `For all ${cycleCount} cycles`;
+  let hint = perStep ? "For each form" : "No timer, at your own pace";
+  if (model.timingMode === TOTAL) {
+    hint = cycleCount == null ? "For all cycles" : cycleCount === 1 ? "For 1 cycle" : `For all ${cycleCount} cycles`;
+  }
   setText(durationHint, hint);
 
-  // The two amounts the practitioner did not enter, calculated from the one they did.
+  // The two amounts the practitioner did not enter, calculated from the one they did. Freestyle has
+  // no time to calculate, only steps.
   const chosen = configuration();
-  const values = perStep
-    ? [["Per cycle", chosen && TimeText.duration(chosen.secondsPerCycle)],
-       ["Planned time", chosen && TimeText.duration(chosen.plannedSeconds)]]
-    : [["Per step", chosen && TimeText.approximateDuration(chosen.secondsPerStage)],
-       ["Per cycle", chosen && TimeText.approximateDuration(chosen.secondsPerCycle)]];
+  let values = [["Per step", chosen && TimeText.approximateDuration(chosen.secondsPerStage)],
+                ["Per cycle", chosen && TimeText.approximateDuration(chosen.secondsPerCycle)]];
+  if (perStep) {
+    values = [["Per cycle", chosen && TimeText.duration(chosen.secondsPerCycle)],
+              ["Planned time", chosen && TimeText.duration(chosen.plannedSeconds)]];
+  } else if (freestyle) {
+    values = [["Per cycle", `${STAGES.length} steps`], ["In all", chosen && `${chosen.stepCount} steps`]];
+  }
   values.forEach(([label, value], index) => {
     setText(summary[index].label, label);
     setText(summary[index].value, value || "—");
   });
   beginButton.disabled = chosen == null;
-  setText(setupNote, perStep
-    ? "Each step gets this full time. Space moves to the next step early."
-    : "This time is shared equally by every step. Space moves to the next step early.");
+  let note = "This time is shared equally by every step. Space moves to the next step early.";
+  if (perStep) note = "Each step gets this full time. Space moves to the next step early.";
+  if (freestyle) note = "No timer: stay with each step as long as you like. Space moves to the next step.";
+  setText(setupNote, note);
 }
 
 function setCapsule(capsule, visible, spoken) {
@@ -567,6 +615,9 @@ function renderStage() {
   setText(stageTitle, stage.title);
   setText(stageContext, stage.context);
   stageContext.hidden = !stage.context;
+  // Freestyle has no countdown: each step lasts until the practitioner moves on.
+  remainingTime.hidden = !engine.configuration.isTimed;
+  metaDivider.hidden = !engine.configuration.isTimed;
   setText(remainingTime, TimeText.countdown(engine.remainingSeconds));
   setText(cyclesCompleted, `${engine.completedCycles} / ${engine.configuration.cycles} cycles completed`);
   runningControls.hidden = !running;
@@ -580,7 +631,16 @@ let meterGlide = null;
 
 /// StepMeter: the bar along the bottom empties as the step's time runs out and holds still while
 /// paused. The browser runs the glide between ticks, on the compositor, with no work per frame.
+/// It is left out in freestyle and when turned off in setup.
 function renderStepMeter() {
+  const shown = engine.configuration.isTimed && model.showsCountdownBar;
+  stepMeter.hidden = !shown;
+  if (!shown) {
+    meterGlide?.cancel();
+    meterGlide = null;
+    meterStep = null;
+    return;
+  }
   const fraction = 1 - engine.progress;
   // A step coming into view, or the next step, starts the bar afresh, like a new StepMeterView.
   const fresh = shownView !== "stage" || meterStep !== engine.transitionCount;
@@ -713,6 +773,11 @@ fullScreenCheckbox.addEventListener("change", () => {
   storage.write("opensInFullScreen", String(model.opensInFullScreen));
 });
 
+countdownBarCheckbox.addEventListener("change", () => {
+  model.showsCountdownBar = countdownBarCheckbox.checked;
+  storage.write("showsCountdownBar", String(model.showsCountdownBar));
+});
+
 byId("setup").addEventListener("submit", (event) => {
   event.preventDefault();
   begin();
@@ -810,24 +875,34 @@ document.addEventListener("keyup", (event) => {
   if ((event.key === " " || event.code === "Space") && !spaceBelongsTo(event.target)) event.preventDefault();
 });
 
-// MARK: Absence (AppMain.pauseForAbsence)
+// MARK: Presence (AppMain.updatePresence)
 
 let absenceCheck = null;
+const inFront = () => !document.hidden && document.hasFocus();
 
 window.addEventListener("blur", () => {
   window.clearTimeout(absenceCheck);
   // Switching to another window or app pauses; a passing focus change does not.
   absenceCheck = window.setTimeout(() => {
-    if (!document.hasFocus()) pause(AWAY, true);
+    if (!document.hasFocus()) setPresent(false);
   }, 250);
 });
 
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) pause(AWAY, true);
-  else updateWakeLock();
+window.addEventListener("focus", () => {
+  window.clearTimeout(absenceCheck);
+  if (inFront()) setPresent(true);
 });
 
-window.addEventListener("pagehide", () => pause(AWAY, true));
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) setPresent(false);
+  else {
+    if (inFront()) setPresent(true);
+    updateWakeLock();
+  }
+});
+
+window.addEventListener("pagehide", () => setPresent(false));
+window.addEventListener("pageshow", () => { if (inFront()) setPresent(true); });
 
 // Leaving or reloading the page mid-practice asks first, as quitting the app does.
 window.addEventListener("beforeunload", (event) => {
@@ -841,6 +916,8 @@ window.addEventListener("beforeunload", (event) => {
 
 if (!fullScreenSupported) document.documentElement.classList.add("no-fullscreen");
 fullScreenCheckbox.checked = model.opensInFullScreen;
+countdownBarCheckbox.checked = model.showsCountdownBar;
+engine.setPresent(inFront(), now());
 byId("confirm-hint").textContent = `Esc to keep practicing · ${isMac ? "⌘Return" : "Ctrl+Enter"} to confirm`;
 syncInputs();
 render();

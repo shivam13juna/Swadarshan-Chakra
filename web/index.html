@@ -65,8 +65,8 @@
               </div>
               <div class="completion-summary">
                 <div><p class="label">Practiced</p><p id="practiced-time" class="value"></p></div>
-                <span class="completion-divider" aria-hidden="true"></span>
-                <div><p class="label">Planned</p><p id="planned-time" class="value"></p></div>
+                <span id="planned-divider" class="completion-divider" aria-hidden="true"></span>
+                <div id="planned-summary"><p class="label">Planned</p><p id="planned-time" class="value"></p></div>
               </div>
               <button type="button" class="gold-button" data-action="practice-again">Practice again</button>
             </div>
@@ -104,9 +104,10 @@
               <div class="field-row">
                 <div class="field-label">
                   <div class="mode-select">
-                    <select id="timing-mode" aria-label="Set time" title="Set the time for each step, or a total shared by every step">
+                    <select id="timing-mode" aria-label="Set time" title="Set the time for each step, a total shared by every step, or no timer (freestyle)">
                       <option value="perStep">Time per step</option>
                       <option value="total">Total time</option>
+                      <option value="freestyle">Freestyle</option>
                     </select>
                     <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3"/></svg>
                   </div>
@@ -125,6 +126,10 @@
                 </div>
               </div>
               <p id="duration-error" class="field-error" hidden></p>
+              <label id="countdown-bar-setting" class="checkbox field-option" title="A thin bar along the bottom of each step shows how much of its time is left. Untick to hide it.">
+                <input id="shows-countdown-bar" type="checkbox">
+                <span>Show countdown bar</span>
+              </label>
             </div>
           </div>
 
@@ -198,7 +203,7 @@
             <p id="stage-context" class="stage-context" lang="hi"></p>
             <p class="stage-meta">
               <span id="remaining-time" class="remaining"></span>
-              <span class="meta-divider" aria-hidden="true"></span>
+              <span id="meta-divider" class="meta-divider" aria-hidden="true"></span>
               <span id="cycles-completed" class="cycles-completed"></span>
             </p>
           </div>
@@ -226,12 +231,17 @@
                 <button type="button" class="artwork-button" data-action="restart" title="Restart practice (R)">Restart</button>
                 <button type="button" class="artwork-button" data-action="end" title="End practice (E)">End</button>
               </div>
+              <p class="hints">
+                <span class="shortcut light"><kbd>Esc</kbd><span>Resume</span></span>
+                <span class="shortcut light"><kbd>R</kbd><span>Restart</span></span>
+                <span class="shortcut light"><kbd>E</kbd><span>End</span></span>
+              </p>
               <p id="pause-reason" class="pause-reason"></p>
             </div>
           </div>
         </div>
       </div>
-      <div class="step-meter" aria-hidden="true"><div id="step-meter-fill" class="step-meter-fill"></div></div>
+      <div id="step-meter" class="step-meter" aria-hidden="true"><div id="step-meter-fill" class="step-meter-fill"></div></div>
     </section>
 
     <!-- Restart or end (ConfirmationOverlay) -->

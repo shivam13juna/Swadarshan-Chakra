@@ -58,9 +58,11 @@ struct FullScreenStageView: View {
                 .padding(.top, max(padding, topInset + 12))
                 .padding(.bottom, padding)
 
-                // How much of this step's time is left, along the bottom edge.
-                StepMeter(engine: engine, moving: model.windowVisible)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                // How much of this step's time is left, along the bottom edge, unless turned off in setup.
+                if engine.configuration.isTimed && model.showsCountdownBar {
+                    StepMeter(engine: engine, moving: model.windowVisible)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                }
             }
             .frame(width: size.width, height: size.height)
             .clipped()
@@ -107,11 +109,14 @@ struct FullScreenStageView: View {
                     .font(Palette.hindi(compact ? 16 : 19)).foregroundColor(.white.opacity(0.88))
             }
             HStack(spacing: 12) {
-                Text(TimeText.countdown(engine.remainingSeconds))
-                    .font(.system(size: 20, weight: .regular, design: .rounded)).monospacedDigit()
-                    .accessibilityLabel("\(TimeText.countdown(engine.remainingSeconds)) remaining")
-                    .accessibilityIdentifier("remaining-time")
-                Rectangle().fill(.white.opacity(0.35)).frame(width: 1, height: 14).accessibilityHidden(true)
+                // Freestyle has no countdown: each step lasts until the practitioner moves on.
+                if engine.configuration.isTimed {
+                    Text(TimeText.countdown(engine.remainingSeconds))
+                        .font(.system(size: 20, weight: .regular, design: .rounded)).monospacedDigit()
+                        .accessibilityLabel("\(TimeText.countdown(engine.remainingSeconds)) remaining")
+                        .accessibilityIdentifier("remaining-time")
+                    Rectangle().fill(.white.opacity(0.35)).frame(width: 1, height: 14).accessibilityHidden(true)
+                }
                 Text("\(engine.completedCycles) / \(engine.configuration.cycles) cycles completed")
                     .font(.system(size: 12)).monospacedDigit()
             }
@@ -145,6 +150,12 @@ struct FullScreenStageView: View {
                     Button("End") { model.request(.end) }
                         .buttonStyle(ArtworkButtonStyle()).keyboardShortcut("e", modifiers: .command)
                         .help("End practice (⌘E)")
+                }
+                // Same order as the buttons above. Esc resumes as well as Return, as it paused.
+                HStack(spacing: 17) {
+                    Shortcut(key: "Esc", action: "Resume", color: .white.opacity(0.85))
+                    Shortcut(key: "⌘R", action: "Restart", color: .white.opacity(0.85))
+                    Shortcut(key: "⌘E", action: "End", color: .white.opacity(0.85))
                 }
                 Text(model.pauseReason).font(.system(size: 11)).foregroundColor(.white.opacity(0.85))
             }

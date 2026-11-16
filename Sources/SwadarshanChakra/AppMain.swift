@@ -32,6 +32,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// starts. Leaving full screen later (green button, ⌃⌘F) is never undone by a focus change.
     private var fullScreenOnOpen = false
     private var quitting = false
+    /// Absences that can leave the window in front: each begins with its first notification and ends
+    /// with its second. Screen locking is announced to every app; the others come from the workspace.
+    private static let workspaceAbsences: [(begins: Notification.Name, ends: Notification.Name)] = [
+        (NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification),
+        (NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification),
+        (NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.sessionDidBecomeActiveNotification)
+    ]
+    private static let screenLock = (begins: Notification.Name("com.apple.screenIsLocked"),
+                                     ends: Notification.Name("com.apple.screenIsUnlocked"))
+    private var absences: Set<Notification.Name> = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do { artwork = try ArtworkLibrary() }
@@ -215,6 +225,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func hideMeditation() {
         wantsMeditationVisible = false
         model?.windowVisible = false
+        updatePresence()
         fullScreenOnOpen = false
         guard let window, fullScreenTransition == nil else { return }
         if window.styleMask.contains(.fullScreen) {
@@ -331,20 +342,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model?.windowVisible = wantsMeditationVisible && window?.occlusionState.contains(.visible) == true
     }
     func windowDidBecomeKey(_ notification: Notification) {
+        updatePresence()
         DispatchQueue.main.async { [weak self] in self?.enterFullScreenIfNeeded() }
     }
     func windowDidResignKey(_ notification: Notification) {
         logSmokeLifecycle("Window resigned key")
-        pauseForAbsence()
+        updatePresence()
     }
     func applicationDidResignActive(_ notification: Notification) {
         logSmokeLifecycle("Application resigned active")
-        pauseForAbsence()
+        updatePresence()
     }
-    func applicationDidHide(_ notification: Notification) { pauseForAbsence() }
+    func applicationDidHide(_ notification: Notification) { updatePresence() }
     func applicationDidBecomeActive(_ notification: Notification) {
         if wantsMeditationVisible && window?.isVisible == true { window?.makeKeyAndOrderFront(nil) }
+        updatePresence()
         DispatchQueue.main.async { [weak self] in self?.enterFullScreenIfNeeded() }
+    }
+
+    /// The practitioner is with the practice while its window is in front and the Mac is awake and
+    /// unlocked. Leaving pauses a running practice; a pause counts as practice only while they're here.
+    private func updatePresence() {
+        model?.setPresent(wantsMeditationVisible && NSApp.isActive && window?.isKeyWindow == true && absences.isEmpty)
+    }
+
+    @objc private func absenceChanged(_ notification: Notification) {
+        for (begins, ends) in Self.workspaceAbsences + [Self.screenLock] {
+            if notification.name == begins { absences.insert(begins) }
+            if notification.name == ends { absences.remove(begins) }
+        }
+        updatePresence()
     }
 
     private func handleKey(_ event: NSEvent) -> NSEvent? {
@@ -373,17 +400,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func observeLifecycle() {
         let workspace = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification,
-                     NSWorkspace.sessionDidResignActiveNotification] {
-            workspace.addObserver(self, selector: #selector(pauseForAbsence), name: name, object: nil)
+        for (begins, ends) in Self.workspaceAbsences {
+            for name in [begins, ends] {
+                workspace.addObserver(self, selector: #selector(absenceChanged(_:)), name: name, object: nil)
+            }
         }
-        DistributedNotificationCenter.default().addObserver(self, selector: #selector(pauseForAbsence),
-            name: Notification.Name("com.apple.screenIsLocked"), object: nil)
+        for name in [Self.screenLock.begins, Self.screenLock.ends] {
+            DistributedNotificationCenter.default().addObserver(self, selector: #selector(absenceChanged(_:)),
+                name: name, object: nil)
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
     }
 
-    @objc private func pauseForAbsence() {
+    /// A display change pauses as if the practitioner had been away, without changing whether they're here.
+    private func pauseForAbsence() {
         model?.pause(reason: "Paused while you were away.", away: true)
     }
 
@@ -615,6 +646,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 model.practiceAgain()
                 model.setTimingMode(.perStep)
                 try require(model.minutesText == "0" && model.secondsText == "40", "Switching back shows 40 seconds per step")
+                model.setTimingMode(.freestyle)
+                model.begin()
+                try require(model.engine.phase == .running && !model.engine.configuration.isTimed,
+                            "Freestyle begins a practice with no timer")
+                model.pause()
+                model.practiceAgain()
+                model.setTimingMode(.perStep)
+                try require(model.minutesText == "0" && model.secondsText == "40",
+                            "Choosing a timer after freestyle brings the same time back")
                 model.minutesText = "1"
                 model.secondsText = "00"
                 model.cyclesText = "2"
@@ -629,6 +669,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 for _ in 0..<4 { key(49, " ", repeatKey: true) }
                 try await settle()
                 try require(model.engine.stageIndex == 1, "Native key repeats are consumed")
+                let practicedBeforePause = model.engine.activeSeconds
                 key(53, "\u{1b}")
                 try await settle()
                 try require(model.engine.phase == .paused, "Escape pauses")
@@ -643,12 +684,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 try await settle()
                 try require(model.engine.phase == .running && model.engine.stageIndex == 1,
                             "Escape again resumes the same step")
+                try require(model.engine.activeSeconds - practicedBeforePause >= 0.4,
+                            "Time paused with the window in front counts as practice")
                 NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.willSleepNotification, object: nil)
-                try require(model.engine.phase == .paused, "Mac sleep notification pauses practice")
+                try require(model.engine.phase == .paused && !model.engine.isPresent, "Mac sleep notification pauses practice")
+                NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+                try require(model.engine.isPresent, "After waking, a pause counts as practice again")
                 model.resume()
-                // Exercise the lock handler locally; never broadcast a fake lock to other apps.
-                pauseForAbsence()
-                try require(model.engine.phase == .paused, "Screen-lock handler pauses practice")
+                // Exercise the lock handlers locally; never broadcast a fake lock to other apps.
+                absenceChanged(Notification(name: Self.screenLock.begins))
+                try require(model.engine.phase == .paused && !model.engine.isPresent, "Screen-lock handler pauses practice")
+                absenceChanged(Notification(name: Self.screenLock.ends))
+                try require(model.engine.isPresent, "After unlocking, a pause counts as practice again")
                 model.resume()
                 // Transfer real keyboard focus to another window in this app's Space.
                 // Programmatic app deactivation cannot grant the subsequent activation
@@ -659,11 +706,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 focusProbe.collectionBehavior = [.fullScreenAuxiliary]
                 focusProbe.makeKeyAndOrderFront(nil)
                 try await settle()
-                try require(focusProbe.isKeyWindow && model.engine.phase == .paused,
-                            "Losing the key window pauses practice")
+                try require(focusProbe.isKeyWindow && model.engine.phase == .paused && !model.engine.isPresent,
+                            "Losing the key window pauses practice and stops counting the pause")
                 focusProbe.close()
                 showMeditation()
                 try await awaitFullScreen()
+                try require(model.engine.isPresent, "The window back in front counts the pause again")
                 model.request(.restart)
                 try require(model.engine.phase == .confirming, "Restart asks before discarding progress")
                 key(53, "\u{1b}")

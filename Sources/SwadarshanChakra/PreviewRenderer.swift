@@ -20,7 +20,10 @@ enum PreviewRenderer {
                     ("long-duration", 1024, 640), ("zero-duration", 1024, 640),
                     ("cycle-intro", 1440, 900), ("next-cycle-intro", 1440, 900), ("compact-cycle-intro", 1024, 640),
                     ("second-cycle-paused", 1440, 900), ("total-time", 1440, 900),
-                    ("compact-total-time", 1024, 640), ("total-time-too-short", 1024, 640)
+                    ("compact-total-time", 1024, 640), ("total-time-too-short", 1024, 640),
+                    ("freestyle", 1440, 900), ("compact-freestyle", 1024, 640), ("freestyle-running", 1440, 900),
+                    ("freestyle-paused", 1024, 640), ("freestyle-complete", 1440, 900),
+                    ("no-countdown-bar", 1440, 900)
                 ]
                 for (name, width, height) in scenarios {
                     let model = makeModel(name)
@@ -58,8 +61,19 @@ enum PreviewRenderer {
 
     private static func makeModel(_ name: String) -> SessionModel {
         let setupScreens = ["ready", "compact-ready", "invalid", "long-duration", "zero-duration",
-                            "total-time", "compact-total-time", "total-time-too-short"]
+                            "total-time", "compact-total-time", "total-time-too-short", "freestyle", "compact-freestyle"]
         let defaults = UserDefaults(suiteName: "com.swadarshan.chakra.previews")!
+        if name.hasPrefix("freestyle-") {
+            // Freestyle steps, without the card that opens each cycle: no countdown, and no bar.
+            var engine = SessionEngine(introductionDuration: 0)
+            engine.begin(try! SessionConfiguration(freestyleCycles: name == "freestyle-complete" ? 1 : 3), at: 0)
+            engine.nextStage(at: 95)
+            if name == "freestyle-paused" { engine.pause(at: 200) }
+            if name == "freestyle-complete" {
+                for now in [260.0, 410, 530, 702] { engine.nextStage(at: now) }
+            }
+            return SessionModel(defaults: defaults, automaticTicks: false, initialEngine: engine)
+        }
         if name.hasSuffix("cycle-intro") || name == "second-cycle-paused" {
             var engine = SessionEngine()
             engine.begin(try! SessionConfiguration(cycles: 3, minutesPerStep: 1), at: 0)
@@ -103,6 +117,14 @@ enum PreviewRenderer {
             model.setTimingMode(.total)
             model.minutesText = name == "total-time-too-short" ? "5" : "10"
             model.secondsText = "00"
+        }
+        if name.hasSuffix("freestyle") {
+            model.cyclesText = "3"
+            model.setTimingMode(.freestyle)
+        }
+        if name == "no-countdown-bar" {
+            model.showsCountdownBar = false
+            defaults.removeObject(forKey: "showsCountdownBar")   // Only this capture goes without it.
         }
         return model
     }

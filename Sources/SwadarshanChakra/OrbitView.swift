@@ -152,10 +152,13 @@ private struct CompletionFocus: View {
                 Text("\(model.engine.completedCycles) \(model.engine.completedCycles == 1 ? "cycle" : "cycles") completed")
                     .font(.system(size: 13)).foregroundColor(Palette.muted)
             }
+            // Practiced includes time paused with a step; freestyle planned no time to compare it with.
             HStack(spacing: 24) {
                 summary("PRACTICED", TimeText.elapsed(model.engine.activeSeconds))
-                Rectangle().fill(Palette.gold.opacity(0.25)).frame(width: 1, height: 32)
-                summary("PLANNED", TimeText.elapsed(model.engine.configuration.plannedSeconds))
+                if model.engine.configuration.isTimed {
+                    Rectangle().fill(Palette.gold.opacity(0.25)).frame(width: 1, height: 32)
+                    summary("PLANNED", TimeText.elapsed(model.engine.configuration.plannedSeconds))
+                }
             }.padding(.vertical, compact ? 0 : 4)
             HStack(spacing: 10) {
                 Button("Practice again", action: model.practiceAgain).buttonStyle(GoldButtonStyle())

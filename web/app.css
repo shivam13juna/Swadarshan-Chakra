@@ -611,6 +611,13 @@ button { cursor: pointer; }
   line-height: 1.4;
 }
 
+/* "Show countdown bar", under the time it belongs to. */
+.field-option {
+  display: flex;
+  width: fit-content;
+  margin-top: 9px;
+}
+
 .input-box {
   flex: none;
   border: 1px solid rgba(245, 237, 217, 0.16);
@@ -772,7 +779,9 @@ button { cursor: pointer; }
   .brand-hindi { font-size: 23px; }
   .status { margin-right: 8px; }
   .overview-body { gap: 22px; }
-  .setup-panel { gap: 18px; width: 286px; padding: 22px; }
+  /* Tighter spacing leaves room for the countdown-bar setting at 1024 × 640. */
+  .setup-panel { gap: 14px; width: 286px; padding: 22px; }
+  .setup-intro { gap: 9px; }
   .setup-title { font-size: 28px; }
   .setup-fields { gap: 16px; }
 }

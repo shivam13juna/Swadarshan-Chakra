@@ -61,7 +61,8 @@ enum CoreCheckRunner {
             ("Space on expired stage", suite.testSpaceOnExpiredStageConsumesOnlyExpiration),
             ("Queued stale event", suite.testQueuedKeyFromPriorStageIsIgnored),
             ("Distinct quick presses", suite.testDistinctQuickPhysicalPressesStillWork),
-            ("Pause and exact resume", suite.testPauseExcludesElapsedAbsenceAndResumesExactly),
+            ("Pause and exact resume", suite.testPauseKeepsTheStepTimeAndResumesExactly),
+            ("Paused time counts while present", suite.testPausedTimeCountsAsPracticeOnlyWhilePresent),
             ("Unobserved time gap", suite.testLongUnobservedGapPausesWithoutUnattendedProgress),
             ("Space after stall", suite.testSpaceAfterLongStallAlsoPauses),
             ("Pause at deadline", suite.testPauseAtDeadlineNeverAdvancesUntilResumed),
@@ -86,7 +87,10 @@ enum CoreCheckRunner {
             ("Space on a title card", suite.testSpaceOnTitleCardBeginsFirstStepOnly),
             ("Title card boundary", suite.testTitleCardEndAndSpaceAtSameBoundaryIsOneTransition),
             ("Pause on a title card", suite.testPausingOnTitleCardKeepsTheFullFirstStep),
-            ("Total time preferences", suite.testTotalTimePreferencesRoundTripAndFallBack)
+            ("Total time preferences", suite.testTotalTimePreferencesRoundTripAndFallBack),
+            ("Freestyle has no timer", suite.testFreestyleHasNoTimer),
+            ("Freestyle steps", suite.testFreestyleStepsLastUntilThePractitionerMovesOn),
+            ("Freestyle preferences", suite.testFreestylePreferencesKeepTheTimeLastEntered)
         ]
         for (name, test) in cases {
             let previous = Check.failures

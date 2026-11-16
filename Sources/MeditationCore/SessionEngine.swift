@@ -17,14 +17,21 @@ public struct SessionEngine: Sendable {
     public private(set) var completedCycles = 0
     public private(set) var remainingSeconds: TimeInterval = 60
     public private(set) var introductionRemaining: TimeInterval = 0
+    /// The time practiced: every running step, and every pause spent with the practice (`isPresent`).
+    /// Cycle cards, confirmations, and time away never count.
     public private(set) var activeSeconds: TimeInterval = 0
     public private(set) var pendingConfirmation: Confirmation?
     public private(set) var transitionCount = 0
+    /// Whether the practitioner is with the practice: its window is in front, and the Mac is awake and
+    /// unlocked. It outlasts any one practice; see setPresent(_:at:).
+    public private(set) var isPresent = true
 
     private var lastSample: TimeInterval = 0
     private var stageStartedAt: TimeInterval = 0
     private var lastAutomaticTransition: TimeInterval?
     private var resumeOnCancel = false
+    /// While paused with the practitioner present, the moment from which the pause is not yet counted.
+    private var pausedSince: TimeInterval?
 
     /// Coalesce a physical key press and a timer expiration delivered at the same boundary.
     public static let boundaryTolerance: TimeInterval = 0.15
@@ -35,12 +42,14 @@ public struct SessionEngine: Sendable {
     public var currentStage: Stage { Stage.all[stageIndex] }
     public var currentCycle: Int { min(completedCycles + 1, configuration.cycles) }
     public var isIntroducingCycle: Bool { phase == .running && introductionRemaining > 0 }
+    /// The share of this step's time already practiced, from 0 to 1. A freestyle step has no time to share.
     public var progress: Double {
-        min(1, max(0, 1 - remainingSeconds / configuration.secondsPerStage))
+        guard configuration.isTimed else { return 0 }
+        return min(1, max(0, 1 - remainingSeconds / configuration.secondsPerStage))
     }
 
     public mutating func begin(_ configuration: SessionConfiguration, at now: TimeInterval) {
-        self = SessionEngine(introductionDuration: introductionDuration)
+        reset()
         self.configuration = configuration
         remainingSeconds = configuration.secondsPerStage
         introductionRemaining = introductionDuration
@@ -55,7 +64,7 @@ public struct SessionEngine: Sendable {
     public mutating func tick(at now: TimeInterval, maximumGap: TimeInterval? = nil) -> Bool {
         guard phase == .running else { return false }
         if let maximumGap, now - lastSample > maximumGap {
-            pauseAtLastSample()
+            pauseAtLastSample(at: now)
             return false
         }
         if introductionRemaining > 0 {
@@ -67,7 +76,8 @@ public struct SessionEngine: Sendable {
             return true
         }
         accrue(until: now)
-        if remainingSeconds <= 0 {
+        // A freestyle step never ends by itself.
+        if configuration.isTimed && remainingSeconds <= 0 {
             advance(at: now, automatic: true)
             return true
         }
@@ -114,18 +124,41 @@ public struct SessionEngine: Sendable {
             accrue(until: now)
         }
         phase = .paused
+        // Time paused with a step is practice too, while the practitioner is here.
+        pausedSince = isPresent ? now : nil
     }
 
-    public mutating func pauseAtLastSample() {
+    /// Pauses as of the last sample, for an absence noticed only now: the time since that sample never
+    /// counts. Paused time counts from now while the practitioner is here.
+    public mutating func pauseAtLastSample(at now: TimeInterval) {
         if phase == .confirming { resumeOnCancel = false }
         if phase == .running {
             introductionRemaining = 0
             phase = .paused
+            pausedSince = isPresent ? now : nil
+        }
+    }
+
+    /// The practitioner has left the practice or come back to it: its window left the front or came
+    /// back, or the Mac slept or woke, locked or unlocked. Leaving pauses a running practice as of its
+    /// last sample. A pause counts as practice only while they are here.
+    public mutating func setPresent(_ present: Bool, at now: TimeInterval) {
+        guard present != isPresent else { return }
+        if present {
+            isPresent = true
+            if phase == .paused { pausedSince = now }
+        } else {
+            countPause(until: now)
+            pausedSince = nil
+            isPresent = false
+            pauseAtLastSample(at: now)
         }
     }
 
     public mutating func resume(at now: TimeInterval) {
         guard phase == .paused else { return }
+        countPause(until: now)
+        pausedSince = nil
         lastSample = now
         // Reject events queued while the window was hidden or the session was paused.
         stageStartedAt = now
@@ -137,6 +170,9 @@ public struct SessionEngine: Sendable {
         guard phase == .running || phase == .paused else { return }
         let wasRunning = phase == .running
         pause(at: now)
+        // The question is not practice: the pause stops counting while it is asked.
+        countPause(until: now)
+        pausedSince = nil
         resumeOnCancel = wasRunning
         pendingConfirmation = action
         phase = .confirming
@@ -148,6 +184,7 @@ public struct SessionEngine: Sendable {
         pendingConfirmation = nil
         resumeOnCancel = false
         phase = .paused
+        pausedSince = isPresent ? now : nil
         if shouldResume { resume(at: now) }
     }
 
@@ -162,14 +199,25 @@ public struct SessionEngine: Sendable {
         return action
     }
 
-    public mutating func reset() { self = SessionEngine(introductionDuration: introductionDuration) }
+    public mutating func reset() {
+        let present = isPresent
+        self = SessionEngine(introductionDuration: introductionDuration)
+        isPresent = present
+    }
 
     private mutating func accrue(until now: TimeInterval) {
         let delta = max(0, now - lastSample)
-        let practiced = min(remainingSeconds, delta)
+        // A timed step counts only up to its end; a freestyle step lasts as long as it is given.
+        let practiced = configuration.isTimed ? min(remainingSeconds, delta) : delta
         activeSeconds += practiced
         remainingSeconds = max(0, remainingSeconds - practiced)
         lastSample = max(lastSample, now)
+    }
+
+    private mutating func countPause(until now: TimeInterval) {
+        guard let since = pausedSince else { return }
+        activeSeconds += max(0, now - since)
+        pausedSince = max(since, now)
     }
 
     private mutating func advance(at now: TimeInterval, automatic: Bool) {

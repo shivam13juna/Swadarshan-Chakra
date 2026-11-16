@@ -22,7 +22,7 @@
 
 Swadarshan Chakra guides you through five consecutive forms of spiritual self-awareness, one at a time. Each form's picture fills your screen while you contemplate it. When its time is up, the next form begins, and after the fifth, the circle starts again. One pass through all five forms is a **cycle**.
 
-You choose how many cycles to practice and how much time to give them. The app keeps time, so you don't have to.
+You choose how many cycles to practice and how much time to give them. The app keeps time, so you don't have to. Or practice freestyle, with no timer at all.
 
 No Mac, or nothing to install? The same practice runs in any modern browser at **[swadarshan-chakra.web.app](https://swadarshan-chakra.web.app)**, on a computer or a phone. Your settings stay in that browser.
 
@@ -85,6 +85,9 @@ Swadarshan Chakra lives in your **menu bar** as a small gold chakra. Click it to
 
 - **Time per step** gives every form the time you enter.<br>*1 minute per step → 5 minutes per cycle.*
 - **Total time** is the time you have for the whole practice, shared equally by every step.<br>*10 minutes for 3 cycles → 40 seconds per step.*
+- **Freestyle** has no timer at all. Stay with each form as long as you like, and press <kbd>Space</kbd> for the next.
+
+With a timer, **Show countdown bar** puts a thin bar along the bottom of each step to show how much of its time is left. Untick it if you'd rather not see it.
 
 Clicking a field selects its whole value, so you can type the new one straight away. The panel shows what your choice works out to. Press **Begin meditation** (or <kbd>Return</kbd>). Your settings are remembered for next time.
 
@@ -95,9 +98,9 @@ Clicking a field selects its whole value, so you can type the new one straight a
 Each step fills your screen, as in [the five steps](#the-five-steps) above.
 
 - The current **cycle** and **step** are in the top-left corner. The form's name and the time remaining are at the bottom.
-- A thin white bar along the bottom edge shows how much of the step's time is left. It is full as the step begins, empties as the time runs out, and holds still while paused.
-- When a step's time is up, the next one begins by itself. Ready sooner? Press <kbd>Space</kbd>.
-- <kbd>Esc</kbd> pauses, and <kbd>Esc</kbd> again carries on, so you can stay longer with a step: its time waits while you're paused. From the pause you can also restart or end the practice.
+- A thin white bar along the bottom edge shows how much of the step's time is left, unless you've turned it off. It is full as the step begins, empties as the time runs out, and holds still while paused.
+- When a step's time is up, the next one begins by itself. Ready sooner? Press <kbd>Space</kbd>. In freestyle there is no countdown and no bar: each step waits for your <kbd>Space</kbd>.
+- <kbd>Esc</kbd> pauses, and <kbd>Esc</kbd> again carries on, so you can stay longer with a step: its time waits while you're paused. From the pause you can also restart or end the practice. The pause screen shows the keys for all three.
 - The **×** in the top-right corner (or <kbd>⌘</kbd> <kbd>W</kbd>) ends the practice and closes the window. The chakra in the menu bar opens the setup screen again.
 - If you switch to another app or your Mac goes to sleep, the practice pauses and waits for you. Nothing moves on while you're away.
 
@@ -113,7 +116,7 @@ Each cycle opens with a short card: *Cycle 1*, *Cycle 2*, and so on. After three
 
 ![The completion screen, showing the time practiced and the time planned](docs/screenshots/complete.jpg)
 
-When the last cycle ends, you'll see how many cycles you completed and how long you actually practiced. Press <kbd>Return</kbd> to practice again.
+When the last cycle ends, you'll see how many cycles you completed and how long you actually practiced. That includes the time you spent paused with a step in front of you. Time away doesn't count: in another app, or with your Mac asleep or locked. Press <kbd>Return</kbd> to practice again.
 
 ## Full screen or a window
 
@@ -182,9 +185,9 @@ Either workflow can also be run by hand from the Actions tab. Removing the Mac a
 
 | Path | Contents |
 |---|---|
-| `Sources/MeditationCore` | Settings, the five forms, and the session state machine: timing, cycles, pause, and Space |
+| `Sources/MeditationCore` | Settings, the five forms, and the session state machine: timing and freestyle, cycles, pause, and Space |
 | `Sources/SwadarshanChakra` | The macOS app: the menu bar item, the window and full screen, and the SwiftUI screens |
-| `Tests/MeditationCoreTests` | 38 deterministic checks that run without Xcode |
+| `Tests/MeditationCoreTests` | 42 deterministic checks that run without Xcode |
 | `web` | The web version, published to [swadarshan-chakra.web.app](https://swadarshan-chakra.web.app) |
 | `Tests/web` | Node checks for the web version's engine |
 | `docs` | The screenshots and icon this README uses |
