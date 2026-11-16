@@ -20,7 +20,7 @@
 
 ## What it does
 
-Swadarshan Chakra guides you through five consecutive forms of spiritual self-awareness, one at a time. Each form's picture fills your screen while you contemplate it. When its time is up, the next form begins, and after the fifth, the circle starts again. One pass through all five forms is a **cycle**.
+Swadarshan Chakra guides you through five consecutive forms of spiritual self-awareness, one at a time. Each form's picture fills your screen while you contemplate it. When its time is up, the hand on the cycle of ages turns to where the next form stands, and the next form begins. After the fifth, the circle starts again. One pass through all five forms is a **cycle**. At the end, you can see how you spent your time, step by step and cycle by cycle.
 
 You choose how many cycles to practice and how much time to give them. The app keeps time, so you don't have to. Or practice freestyle, with no timer at all.
 
@@ -99,24 +99,42 @@ Each step fills your screen, as in [the five steps](#the-five-steps) above.
 
 - The current **cycle** and **step** are in the top-left corner. The form's name and the time remaining are at the bottom.
 - A thin white bar along the bottom edge shows how much of the step's time is left, unless you've turned it off. It is full as the step begins, empties as the time runs out, and holds still while paused.
-- When a step's time is up, the next one begins by itself. Ready sooner? Press <kbd>Space</kbd>. In freestyle there is no countdown and no bar: each step waits for your <kbd>Space</kbd>.
+- When a step's time is up, the next one begins by itself, after [a short card](#3-before-each-step) showing where it stands in the cycle of ages. Ready sooner? Press <kbd>Space</kbd>. In freestyle there is no countdown and no bar: each step waits for your <kbd>Space</kbd>.
 - <kbd>Esc</kbd> pauses, and <kbd>Esc</kbd> again carries on, so you can stay longer with a step: its time waits while you're paused. From the pause you can also restart or end the practice. The pause screen shows the keys for all three.
 - The **×** in the top-right corner (or <kbd>⌘</kbd> <kbd>W</kbd>) ends the practice and closes the window. The chakra in the menu bar opens the setup screen again.
 - If you switch to another app or your Mac goes to sleep, the practice pauses and waits for you. Nothing moves on while you're away.
 
 ![The practice paused in the second cycle, with Resume, Restart, and End in the bottom-right corner](docs/screenshots/paused.jpg)
 
-### 3. A moment between cycles
+### 3. Before each step
+
+![The card between the first and second steps: the cycle of ages, its white hand turned to Sat Yuga](docs/screenshots/between-steps.jpg)
+
+Every step opens with a short card showing the cycle of ages, with a white hand fixed at the swastika's centre. The hand shows where the step stands in the cycle. Between steps it turns clockwise like a clock's, from where the step you've finished stands to where the next one does:
+
+- Before step 1, **बीज रूप**: the hand stands at the top, where the Confluence Age meets Sat Yuga. It doesn't turn; this card follows the cycle's own card.
+- Before step 2, **विश्व महाराजन**: from the top to Sat Yuga.
+- Before step 3, **पूज्य स्वरूप**: on to Dwapar Yuga.
+- Before step 4, **परम पवित्र ब्राह्मण**: on to the Confluence Age.
+- Before step 5, **फरिश्ता स्वरूप**: back to the top, where the next cycle starts.
+
+After three seconds the step begins on its own. Press <kbd>Space</kbd> to begin it right away. The card isn't counted as practice time, and every step still gets its full time.
+
+### 4. A moment between cycles
 
 ![The card that opens the second cycle: the gold chakra above the words "Cycle 2"](docs/screenshots/cycle-card.jpg)
 
-Each cycle opens with a short card: *Cycle 1*, *Cycle 2*, and so on. After three seconds the first step begins on its own. The card isn't counted as practice time, and every step still gets its full time.
+Each cycle opens with a short card: *Cycle 1*, *Cycle 2*, and so on. After three seconds it gives way to step 1's card, and then the first step begins. Neither card is counted as practice time, and every step still gets its full time. <kbd>Space</kbd> on either card begins the step at once.
 
-### 4. Finish
+### 5. Finish
 
-![The completion screen, showing the time practiced and the time planned](docs/screenshots/complete.jpg)
+![The completion screen: the time practiced and planned, and beside it a table of each cycle's time in each step, its total, and its average per step](docs/screenshots/complete.jpg)
 
-When the last cycle ends, you'll see how many cycles you completed and how long you actually practiced. That includes the time you spent paused with a step in front of you. Time away doesn't count: in another app, or with your Mac asleep or locked. Press <kbd>Return</kbd> to practice again.
+When the last cycle ends, you'll see how many cycles you completed and how long you actually practiced. That includes the time you spent paused with a step in front of you. Time away doesn't count: in another app, or with your Mac asleep or locked.
+
+Beside it, **Your time** shows how you spent it. Each cycle has a row with the time you gave each of the five steps, then **Average per step** and **Total this cycle**. With more than one cycle, a last row adds them all up. A long practice scrolls; the column titles and that last row stay in view.
+
+Press <kbd>Return</kbd> to practice again.
 
 ## Full screen or a window
 
@@ -129,7 +147,7 @@ You can also switch at any time, as in any Mac app: click the green window butto
 | Keys | Action |
 |---|---|
 | <kbd>Return</kbd> | Begin · Resume · Practice again |
-| <kbd>Space</kbd> | Next step, or start a cycle right away from its card |
+| <kbd>Space</kbd> | Next step, or start a step right away from its card |
 | <kbd>Esc</kbd> | Pause · Resume |
 | <kbd>⌘</kbd> <kbd>R</kbd> / <kbd>⌘</kbd> <kbd>E</kbd> | Restart / End, while paused (asks first) |
 | <kbd>⌘</kbd> <kbd>Return</kbd> | Confirm restart, end, or quit |
@@ -167,7 +185,7 @@ The app also has built-in checks:
 ```sh
 APP="dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra"
 "$APP" --verify-resources            # the packaged app decodes all five pictures
-"$APP" --verify-timer                # live 3-second cycle card, 12-second step, and step bar; about 17 s, off screen
+"$APP" --verify-timer                # live cycle card, step cards, 12-second step, and step bar; about 23 s, off screen
 "$APP" --smoke-test                  # drives the real full-screen window; about 45 s, takes over the screen
 "$APP" --render-previews <folder>    # renders every screen to PNG, as used for the screenshots here
 ```
@@ -185,13 +203,14 @@ Either workflow can also be run by hand from the Actions tab. Removing the Mac a
 
 | Path | Contents |
 |---|---|
-| `Sources/MeditationCore` | Settings, the five forms, and the session state machine: timing and freestyle, cycles, pause, and Space |
+| `Sources/MeditationCore` | Settings, the five forms, and the session state machine: timing and freestyle, cycles, the cards before steps, pause, Space, and the time of each step |
 | `Sources/SwadarshanChakra` | The macOS app: the menu bar item, the window and full screen, and the SwiftUI screens |
-| `Tests/MeditationCoreTests` | 42 deterministic checks that run without Xcode |
+| `Tests/MeditationCoreTests` | 44 deterministic checks that run without Xcode |
 | `web` | The web version, published to [swadarshan-chakra.web.app](https://swadarshan-chakra.web.app) |
 | `Tests/web` | Node checks for the web version's engine |
 | `docs` | The screenshots and icon this README uses |
 | `5_pictures` | The five original pictures. The bundled copies must match them byte for byte, and `Stage.swift` maps each to its form |
+| `dial_pictures` | The original cycle of ages (`yuga_chakra_v2.png`) and its hour hand (`white_clock_hand.png`), for the cards before steps. The bundled copies must match them byte for byte; `YugaDial.swift` records where the swastika's centre and the hand's base lie |
 | `scripts` | Build, check, icon, and artwork-verification scripts |
 
 [VERIFICATION.md](VERIFICATION.md) records what has been verified and how; [prd_v2.md](prd_v2.md) is the product specification.

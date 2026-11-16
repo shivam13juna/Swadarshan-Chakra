@@ -84,6 +84,8 @@ enum CoreCheckRunner {
             ("Switching timing mode", suite.testSwitchingTimingModeKeepsThePractice),
             ("Total time session length", suite.testTotalTimeSessionFinishesAtTheEnteredTotal),
             ("Cycle title cards", suite.testEveryCycleOpensWithATitleCardOutsidePracticeTime),
+            ("Cards between steps", suite.testEveryLaterStepOpensWithACardOutsidePracticeTime),
+            ("Time for each step", suite.testTimeIsRecordedForEachStepOfEachCycle),
             ("Space on a title card", suite.testSpaceOnTitleCardBeginsFirstStepOnly),
             ("Title card boundary", suite.testTitleCardEndAndSpaceAtSameBoundaryIsOneTransition),
             ("Pause on a title card", suite.testPausingOnTitleCardKeepsTheFullFirstStep),

@@ -212,7 +212,8 @@ final class SessionModel: NSObject, ObservableObject {
     private func announceStage() {
         if engine.phase == .complete { announce("Meditation complete.") }
         else if engine.isIntroducingCycle { announce(cycleTitle) }
-        else { announce(engine.currentStage.label) }
+        // The card between steps says where the hand turns; the step is announced as it begins.
+        else if !engine.isIntroducingStage { announce(engine.currentStage.label) }
     }
 
     private func announce(_ text: String) {

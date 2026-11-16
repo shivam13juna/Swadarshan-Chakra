@@ -156,10 +156,14 @@ export const TimeText = {
   },
 };
 
+const noTime = () => STAGES.map(() => 0);
+
 /// A deterministic state machine. All timestamps are seconds from the same monotonic clock.
 export class SessionEngine {
-  /// Every cycle opens with a short "Cycle N" title card. It is not practice time: the first
-  /// step's countdown starts only when the card ends, so no step is ever shortened by it.
+  /// Every step opens with the cycle of ages, its hand on that step's place, turning there from the
+  /// last step's; a cycle's first step has a "Cycle N" card before that. Cards are not practice time:
+  /// a step's countdown starts only when its cards end, so no step is ever shortened by one.
+  /// introductionDuration is how long each card lasts; 0 goes straight from step to step.
   static standardIntroduction = 3;
   /// Coalesce a physical key press and a timer expiration delivered at the same boundary.
   static boundaryTolerance = 0.15;
@@ -181,8 +185,10 @@ export class SessionEngine {
     this.remainingSeconds = 60;
     this.introductionRemaining = 0;
     /// The time practiced: every running step, and every pause spent with the practice (isPresent).
-    /// Cycle cards, confirmations, and time away never count.
+    /// Cards, confirmations, and time away never count.
     this.activeSeconds = 0;
+    /// The same time, step by step: stepSeconds[cycle][step], for every cycle begun so far.
+    this.stepSeconds = [];
     /// "restart", "end", or null.
     this.pendingConfirmation = null;
     this.transitionCount = 0;
@@ -196,7 +202,14 @@ export class SessionEngine {
 
   get currentStage() { return STAGES[this.stageIndex]; }
   get currentCycle() { return Math.min(this.completedCycles + 1, this.configuration.cycles); }
-  get isIntroducingCycle() { return this.phase === "running" && this.introductionRemaining > 0; }
+  /// A card is showing, before the step at stageIndex.
+  get isIntroducing() { return this.phase === "running" && this.introductionRemaining > 0; }
+  /// The "Cycle N" card, the first of the two before a cycle's first step.
+  get isIntroducingCycle() {
+    return this.isIntroducing && this.stageIndex === 0 && this.introductionRemaining > this.introductionDuration;
+  }
+  /// The card just before the step at stageIndex: the cycle of ages, its hand on that step's place.
+  get isIntroducingStage() { return this.isIntroducing && !this.isIntroducingCycle; }
   /// The share of this step's time already practiced, from 0 to 1. A freestyle step has no time to share.
   get progress() {
     if (!this.configuration.isTimed) return 0;
@@ -207,7 +220,8 @@ export class SessionEngine {
     this.reset();
     this.configuration = configuration;
     this.remainingSeconds = configuration.secondsPerStage;
-    this.introductionRemaining = this.introductionDuration;
+    this.introductionRemaining = this.#cardTime(0);
+    this.stepSeconds = [noTime()];
     this.lastSample = now;
     this.stageStartedAt = now;
     this.phase = "running";
@@ -225,7 +239,7 @@ export class SessionEngine {
       this.introductionRemaining = Math.max(0, this.introductionRemaining - Math.max(0, now - this.lastSample));
       this.lastSample = Math.max(this.lastSample, now);
       if (this.introductionRemaining !== 0) return false;
-      // The card has ended; the cycle's first step starts now with its full time.
+      // The cards have ended; their step starts now with its full time.
       this.#restartClock(now, true);
       return true;
     }
@@ -248,7 +262,7 @@ export class SessionEngine {
     if (this.tick(now, maximumGap)) return true;
     if (this.phase !== "running") return false;
     if (this.introductionRemaining > 0) {
-      // Space on a title card begins that cycle's first step immediately, with its full time.
+      // Space on a card begins its step immediately, with its full time, skipping any card still to come.
       this.introductionRemaining = 0;
       this.#restartClock(now, false);
       return true;
@@ -264,7 +278,7 @@ export class SessionEngine {
     }
     if (this.phase !== "running") return;
     if (this.introductionRemaining > 0) {
-      // Pausing on a title card begins its cycle; the first step waits with its full time.
+      // Pausing on a card begins its step, which waits with its full time.
       this.introductionRemaining = 0;
     } else {
       // Pausing never traverses a stage, even if its deadline has just passed.
@@ -351,15 +365,28 @@ export class SessionEngine {
     const delta = Math.max(0, now - this.lastSample);
     // A timed step counts only up to its end; a freestyle step lasts as long as it is given.
     const practiced = this.configuration.isTimed ? Math.min(this.remainingSeconds, delta) : delta;
-    this.activeSeconds += practiced;
+    this.#record(practiced);
     this.remainingSeconds = Math.max(0, this.remainingSeconds - practiced);
     this.lastSample = Math.max(this.lastSample, now);
   }
 
   #countPause(now) {
     if (this.pausedSince == null) return;
-    this.activeSeconds += Math.max(0, now - this.pausedSince);
+    this.#record(Math.max(0, now - this.pausedSince));
     this.pausedSince = Math.max(this.pausedSince, now);
+  }
+
+  /// Practice belongs to the step on view: this cycle's row, this step's place in it.
+  #record(seconds) {
+    this.activeSeconds += seconds;
+    const row = this.stepSeconds[this.completedCycles];
+    if (row) row[this.stageIndex] += seconds;
+  }
+
+  /// A cycle's first step opens with two cards, "Cycle N" and then the cycle of ages; every later
+  /// step with the cycle of ages alone.
+  #cardTime(stage) {
+    return stage === 0 ? 2 * this.introductionDuration : this.introductionDuration;
   }
 
   #advance(now, automatic) {
@@ -372,10 +399,12 @@ export class SessionEngine {
         return;
       }
       this.stageIndex = 0;
-      this.introductionRemaining = this.introductionDuration;
+      this.stepSeconds.push(noTime());
     } else {
       this.stageIndex += 1;
     }
+    // The next step opens with its cards; its countdown starts when they end.
+    this.introductionRemaining = this.#cardTime(this.stageIndex);
     this.remainingSeconds = this.configuration.secondsPerStage;
     this.#restartClock(now, automatic);
   }

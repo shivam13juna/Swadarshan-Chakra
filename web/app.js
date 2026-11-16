@@ -232,7 +232,7 @@ function update() {
 // MARK: Elements
 
 const app = byId("app");
-const views = { overview: byId("overview"), card: byId("cycle-card"), stage: byId("stage") };
+const views = { overview: byId("overview"), card: byId("cycle-card"), dial: byId("dial-card"), stage: byId("stage") };
 
 const orbit = byId("orbit");
 const ring = byId("ring");
@@ -441,13 +441,13 @@ function layoutOrbit() {
 // MARK: Rendering
 
 let shownView = "overview";
-let wasIntroducing = false;
 let shownArt = null;
 let confirmationShown = false;
 
 function targetView() {
   if (engine.phase === "ready" || engine.phase === "complete") return "overview";
-  return engine.isIntroducingCycle ? "card" : "stage";
+  if (engine.isIntroducingCycle) return "card";
+  return engine.isIntroducingStage ? "dial" : "stage";
 }
 
 function render() {
@@ -456,26 +456,26 @@ function render() {
   // A view that is fading out keeps what it showed: the last picture must not turn into the next cycle's first.
   if (target === "overview") renderOverview();
   else if (target === "card") renderCard();
+  else if (target === "dial") renderDialCard();
   else renderStage();
   renderConfirmation();
   showView(target);
 }
 
 function showView(target) {
-  const introducing = engine.isIntroducingCycle;
-  const fade = introducing !== wasIntroducing && !reducedMotion.matches;
-  wasIntroducing = introducing;
+  const fade = target !== "overview" && !reducedMotion.matches;
   const confirming = engine.phase === "confirming";
   for (const [name, view] of Object.entries(views)) {
     view.inert = name !== target || (name === "stage" && confirming);
   }
   if (target === shownView) return;
   for (const [name, view] of Object.entries(views)) {
-    // The overview leaves and returns at once; the cycle card and the pictures cross-fade.
+    // The overview leaves and returns at once; the cards and the pictures cross-fade.
     view.classList.toggle("is-instant", !fade || name === "overview");
     view.classList.toggle("is-visible", name === target);
   }
   if (target === "card") turnChakra();
+  if (target === "dial") turnDial();
   shownView = target;
 }
 
@@ -518,8 +518,46 @@ function renderOverview() {
     byId("planned-divider").hidden = !engine.configuration.isTimed;
     byId("planned-summary").hidden = !engine.configuration.isTimed;
     setShortcut("Return", "Practice again");
+    renderTimeSummary();
   }
   layoutOrbit();
+}
+
+// MARK: Your time (TimeSummaryPanel.swift)
+
+const timeRows = byId("time-rows");
+const timeAll = byId("time-all");
+let shownSummary = null;
+
+/// Like the practiced time, without the leading zero of the minutes ("1:05", "0:38"), so the numbers
+/// stay clear of each other in narrow columns.
+function clock(seconds) {
+  const text = TimeText.elapsed(seconds);
+  return text.length === 5 && text.startsWith("0") ? text.slice(1) : text;
+}
+
+/// One row of the table: the cycle (or "All"), each step's time, the average per step, and the total.
+function timeRow(name, seconds, stepCount) {
+  const total = seconds.reduce((sum, value) => sum + value, 0);
+  const row = make("tr");
+  const head = make("th", "", name);
+  head.scope = "row";
+  row.append(head);
+  for (const value of seconds) row.append(make("td", "", clock(value)));
+  row.append(make("td", "average", clock(total / stepCount)), make("td", "total", clock(total)));
+  return row;
+}
+
+/// For each cycle, the time practiced in each of its steps, its total, and its average per step; then
+/// all cycles together. Pauses with a step count; the cards and time away don't.
+function renderTimeSummary() {
+  const cycles = engine.stepSeconds;
+  const key = JSON.stringify(cycles);
+  if (key === shownSummary) return;
+  shownSummary = key;
+  timeRows.replaceChildren(...cycles.map((seconds, index) => timeRow(pad2(index + 1), seconds, STAGES.length)));
+  const together = STAGES.map((_, step) => cycles.reduce((sum, seconds) => sum + seconds[step], 0));
+  timeAll.replaceChildren(...(cycles.length > 1 ? [timeRow("All", together, STAGES.length * cycles.length)] : []));
 }
 
 function syncInputs() {
@@ -590,6 +628,46 @@ const cycleCapsule = () => `Cycle ${pad2(engine.currentCycle)} / ${pad2(engine.c
 function renderCard() {
   setCapsule(cardCycleCounter, cycleCapsule(), cycleTitle());
   setText(cycleCardTitle, `Cycle ${engine.currentCycle}`);
+}
+
+// MARK: The card between two steps (DialCardView.swift, YugaDial.swift)
+
+/// Where the hand points for each step, in degrees clockwise from twelve o'clock: the top, where the
+/// Confluence Age meets Sat Yuga (step 1); the middle of Sat Yuga's quarter (2); the middle of Dwapar
+/// Yuga's (3); the middle of the Confluence Age's wedge, 336° to 360° in the picture (4); and the top
+/// again (5), where the next cycle begins.
+const DIAL_ANGLES = [0, 45, 225, 348, 360];
+const DIAL_PLACES = ["the top, where the Confluence Age meets Sat Yuga", "Sat Yuga", "Dwapar Yuga",
+  "the Confluence Age", "the top, where the Confluence Age meets Sat Yuga"];
+const dialCycleCounter = byId("dial-cycle-counter");
+const yugaDial = byId("yuga-dial");
+const dialHand = byId("yuga-dial-hand");
+
+function renderDialCard() {
+  setCapsule(dialCycleCounter, cycleCapsule(), cycleTitle());
+  const turns = engine.stageIndex > 0;
+  yugaDial.setAttribute("aria-label",
+    `Step ${engine.stageIndex + 1} of 5. On the cycle of ages, the hand ${turns ? "turns" : "points"} to ${DIAL_PLACES[engine.stageIndex]}.`);
+}
+
+let dialTurn = null;
+
+/// As the card comes into view, the hand stands where the step just finished does. Once the card has
+/// faded in, it turns clockwise, as a clock does, to where the next step stands; a longer way takes a
+/// little longer, and the longest ends well before the card does. Before a cycle's first step it simply
+/// stands at the top, where that step is. A turn cut short by leaving the card early never carries
+/// over to the next card.
+function turnDial() {
+  const from = DIAL_ANGLES[Math.max(0, engine.stageIndex - 1)];
+  const to = DIAL_ANGLES[engine.stageIndex];
+  dialTurn?.cancel();
+  dialTurn = null;
+  dialHand.style.transform = `rotate(${to}deg)`;
+  if (reducedMotion.matches || from === to) return;
+  dialTurn = dialHand.animate(
+    [{ transform: `rotate(${from}deg)` }, { transform: `rotate(${to}deg)` }],
+    { duration: (0.8 + (to - from) / 150) * 1000, delay: 400, easing: "ease-in-out", fill: "backwards" },
+  );
 }
 
 function showStageArt(stage) {
@@ -683,7 +761,8 @@ function announce(text) {
 function announceStage() {
   if (engine.phase === "complete") announce("Meditation complete.");
   else if (engine.isIntroducingCycle) announce(cycleTitle());
-  else announce(stageLabel(engine.currentStage));
+  // The card between steps says where the hand turns; the step is announced as it begins.
+  else if (!engine.isIntroducingStage) announce(stageLabel(engine.currentStage));
 }
 
 // MARK: Full screen

@@ -346,6 +346,102 @@ button { cursor: pointer; }
 
 #app[data-phase="complete"] .setup-panel { display: none; }
 
+/* TimeSummaryPanel: on completion, in the setup panel's place. */
+.summary-panel {
+  display: none;
+  flex: none;
+  flex-direction: column;
+  align-self: center;
+  gap: 18px;
+  /* Wide enough on a large display for every column title to fit on one line. */
+  width: clamp(470px, 36vw, 560px);
+  max-height: 100%;
+  padding: 28px;
+  border: 0.7px solid rgba(217, 184, 117, 0.17);
+  border-radius: 17px;
+  background: linear-gradient(to bottom right, rgba(16, 20, 31, 0.85), rgba(16, 20, 31, 0.45));
+}
+
+#app[data-phase="complete"] .summary-panel { display: flex; }
+
+.summary-panel .setup-title { font-size: 32px; }
+
+.summary-note { color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+/* Only the cycles scroll: the column titles and the "All" row stay in view. */
+.time-table-wrap { min-height: 0; overflow-y: auto; }
+
+.time-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  table-layout: fixed;
+}
+
+.time-table th,
+.time-table td {
+  height: 27px;
+  padding: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.time-table thead th,
+.time-table tfoot th,
+.time-table tfoot td {
+  position: sticky;
+  background: #0d111b;
+}
+
+/* Every title sits on the row below it. In the compact panel the last two take two lines. */
+.time-table thead th {
+  top: 0;
+  z-index: 1;
+  height: 33px;
+  padding-bottom: 6px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.1px;
+  line-height: 1.4;
+  text-transform: uppercase;
+  vertical-align: bottom;
+}
+
+.time-table thead th:nth-child(n + 2):nth-child(-n + 6) { color: rgba(217, 184, 117, 0.85); }
+.time-table thead th:first-child,
+.time-table thead th:nth-child(n + 7) { letter-spacing: 0.6px; }
+
+.time-table th:first-child { width: 7.5%; text-align: left; }
+.time-table th:nth-child(n + 2):nth-child(-n + 6) { width: 9.3%; }
+.time-table th:nth-child(n + 7) { width: 23%; }
+.title-break { display: none; }
+
+.time-table tbody th { color: var(--muted); font-weight: 500; }
+.time-table tbody td { color: rgba(245, 237, 217, 0.86); }
+.time-table tbody tr { border-bottom: 0.5px solid rgba(245, 237, 217, 0.06); }
+
+.time-table .total { color: var(--ivory); font-weight: 500; }
+.time-table .average { color: var(--gold); font-weight: 500; }
+
+.time-table tfoot th,
+.time-table tfoot td {
+  bottom: 0;
+  border-top: 0.7px solid rgba(217, 184, 117, 0.22);
+  color: var(--ivory);
+  font-weight: 500;
+}
+
+.time-table tfoot th {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+
+.time-table tfoot .average { color: var(--gold); }
+
 /* OrbitView. Positions and sizes are set by app.js from the same formulas as the Mac app. */
 
 .orbit {
@@ -784,6 +880,22 @@ button { cursor: pointer; }
   .setup-intro { gap: 9px; }
   .setup-title { font-size: 28px; }
   .setup-fields { gap: 16px; }
+  .summary-panel { gap: 12px; width: 372px; padding: 22px; }
+  .summary-panel .setup-title { font-size: 26px; }
+  .summary-note { font-size: 11px; }
+  .time-table { font-size: 11px; }
+  .time-table th,
+  .time-table td { height: 24px; }
+  /* Narrower columns: every title still fits its own, the last two on two lines. */
+  .time-table thead th { height: 41px; }
+  .time-table thead th,
+  .time-table tfoot th { letter-spacing: 0.4px; }
+  .time-table thead th:first-child { letter-spacing: 0.2px; }
+  .time-table thead th:nth-child(n + 7) { font-size: 8.5px; letter-spacing: 0.3px; }
+  .time-table th:first-child { width: 10%; }
+  .time-table th:nth-child(n + 2):nth-child(-n + 6) { width: 10.4%; }
+  .time-table th:nth-child(n + 7) { width: 19%; }
+  .title-break { display: inline; }
 }
 
 /* Phones and narrow windows: one scrolling column. */
@@ -799,6 +911,12 @@ button { cursor: pointer; }
   .orbit { flex: none; width: 100%; height: min(112vw, 560px); }
   #app[data-phase="complete"] .orbit { height: auto; min-height: 380px; }
   .setup-panel { width: 100%; max-width: 440px; }
+  /* The page scrolls instead of the table. */
+  .summary-panel { width: 100%; max-width: 440px; max-height: none; }
+  .time-table-wrap { overflow: visible; }
+  .time-table thead th,
+  .time-table tfoot th,
+  .time-table tfoot td { position: static; background: none; }
   .overview-footer { justify-content: center; text-align: center; }
   .overview-footer .shortcut { margin-right: 0; }
 }
@@ -815,7 +933,8 @@ button { cursor: pointer; }
   justify-content: center;
 }
 
-.cycle-card .corner-bar {
+.cycle-card .corner-bar,
+.dial-card .corner-bar {
   position: absolute;
   top: max(var(--edge), env(safe-area-inset-top));
   right: max(var(--edge), env(safe-area-inset-right));
@@ -848,6 +967,40 @@ button { cursor: pointer; }
   font-size: 60px;
   font-weight: 400;
   line-height: 1.1;
+}
+
+/* DialCardView: the card between two steps, the cycle of ages at its centre. */
+
+.dial-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yuga-dial {
+  --dial: clamp(220px, 48vmin, 520px);
+  position: relative;
+  flex: none;
+  width: var(--dial);
+  height: var(--dial);
+}
+
+.yuga-dial img { position: absolute; display: block; max-width: none; }
+
+.yuga-dial-face { top: 0; left: 0; width: 100%; height: 100%; }
+
+/* The hand's base, the middle of its rounded lower end (50%, 96.59% of its picture), is fixed at the
+   swastika's centre (50.04%, 49.40% of the dial), and its tip reaches 26% of the dial's width beyond,
+   about halfway to the rim. app.js turns it clockwise, like a clock, once the card has faded in. */
+.yuga-dial-hand {
+  --hand: calc(var(--dial) * 0.2735);
+  top: calc(var(--dial) * 0.494 - var(--hand) * 0.9659);
+  left: calc(var(--dial) * 0.5004 - var(--hand) / 6);
+  width: calc(var(--hand) / 3);
+  height: var(--hand);
+  transform-origin: 50% 96.59%;
+  /* Even all round, so it stays the same as the hand turns; it keeps the hand clear on gold. */
+  filter: drop-shadow(0 0 1.7px rgba(0, 0, 0, 0.55));
 }
 
 /* FullScreenStageView: the picture fills the window; small controls sit over its edges. */

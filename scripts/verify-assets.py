@@ -23,3 +23,14 @@ bundled_icon = root / "Sources/SwadarshanChakra/Resources/Branding/icon.png"
 if not icon.is_file() or not bundled_icon.is_file() or icon.read_bytes() != bundled_icon.read_bytes():
     raise SystemExit("Bundled branding must match the supplied icon.png exactly.")
 print("Brand icon → icon.png: original verified")
+
+# The cycle-of-ages dial and its hour hand, supplied in dial_pictures like the five in 5_pictures.
+dial_names = ["yuga_chakra_v2.png", "white_clock_hand.png"]
+dial = root / "Sources/SwadarshanChakra/Resources/Dial"
+if sorted(p.name for p in dial.iterdir() if not p.name.startswith(".")) != sorted(dial_names):
+    raise SystemExit("Dial must contain exactly the supplied yuga chakra and clock hand.")
+for name in dial_names:
+    original, bundled = root / "dial_pictures" / name, dial / name
+    if not original.is_file() or original.read_bytes() != bundled.read_bytes():
+        raise SystemExit(f"Bundled dial picture must match the supplied {name} exactly.")
+    print(f"Dial → {name}: original verified")

@@ -62,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             print("All five supplied pictures decoded successfully from \(ArtworkLibrary.resourceBundle.bundlePath)")
             print("Supplied icon.png loaded for the header, dialogs, and menu bar.")
+            print("Supplied yuga_chakra_v2.png and white_clock_hand.png decoded for the card between steps.")
             NSApp.terminate(nil)
             return
         }
@@ -480,21 +481,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         print("PASS Practice opens with the Cycle 1 card")
         let card = try await wait(upTo: 5) { !probe.engine.isIntroducingCycle }
-        guard card >= 2.9 && card < 3.6, probe.engine.phase == .running, probe.engine.stageIndex == 0,
-              probe.engine.remainingSeconds > 11.7 else {
-            throw failure(2, "The cycle card did not last three seconds before a full first step (\(card) s)")
+        guard card >= 2.9 && card < 3.6, probe.engine.isIntroducingStage, probe.engine.stageIndex == 0 else {
+            throw failure(2, "The cycle card did not last three seconds before the first step's own card (\(card) s)")
         }
-        print("PASS The cycle card lasts three seconds, then the first step starts with its full time")
+        print("PASS The cycle card lasts three seconds, then the first step's card shows the cycle of ages")
+        let firstCard = try await wait(upTo: 5) { !probe.engine.isIntroducing }
+        guard firstCard >= 2.9 && firstCard < 3.6, probe.engine.phase == .running, probe.engine.stageIndex == 0,
+              probe.engine.remainingSeconds > 11.7 else {
+            throw failure(2, "The first step's card did not last three seconds before a full first step (\(firstCard) s)")
+        }
+        print("PASS That card lasts three seconds, then the first step starts with its full time")
         let step = try await wait(upTo: 14) { probe.engine.stageIndex != 0 }
-        guard step >= 11.7 && step < 12.6, probe.engine.phase == .running, probe.engine.stageIndex == 1,
+        guard step >= 11.7 && step < 12.6, probe.engine.isIntroducingStage, probe.engine.stageIndex == 1,
               probe.engine.completedCycles == 0 else {
             throw failure(3, "Live timer did not advance exactly one stage after 12 seconds (\(step) s)")
         }
-        print("PASS Live timer advances exactly one stage after 12 seconds")
-        guard probe.engine.remainingSeconds > 11.5 && probe.engine.remainingSeconds <= 12 else {
-            throw failure(4, "Automatic advance did not start a fresh full countdown")
+        print("PASS Live timer advances exactly one stage after 12 seconds, to the card that turns the dial")
+        let turn = try await wait(upTo: 5) { !probe.engine.isIntroducingStage }
+        guard turn >= 2.9 && turn < 3.6, probe.engine.phase == .running, probe.engine.stageIndex == 1,
+              probe.engine.remainingSeconds > 11.5 && probe.engine.remainingSeconds <= 12 else {
+            throw failure(4, "The card between steps did not last three seconds before a fresh full countdown (\(turn) s)")
         }
-        print("PASS Automatic advance starts a fresh full countdown")
+        print("PASS The card between steps lasts three seconds, then the second step starts with its full time")
+        // Let the step screen come in after the card.
+        try await Task.sleep(nanoseconds: 200_000_000)
 
         func stepMeter(in view: NSView) -> StepMeterView? {
             if let found = view as? StepMeterView { return found }
@@ -665,10 +675,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             "Space on the cycle card begins the first step with its full time")
                 key(49, " ")
                 try await settle()
-                try require(model.engine.stageIndex == 1, "Native Space handler advances one stage")
+                try require(model.engine.stageIndex == 1 && model.engine.isIntroducingStage,
+                            "Native Space handler advances one stage, to the card that turns the dial")
                 for _ in 0..<4 { key(49, " ", repeatKey: true) }
                 try await settle()
-                try require(model.engine.stageIndex == 1, "Native key repeats are consumed")
+                try require(model.engine.stageIndex == 1 && model.engine.isIntroducingStage, "Native key repeats are consumed")
                 let practicedBeforePause = model.engine.activeSeconds
                 key(53, "\u{1b}")
                 try await settle()
@@ -742,6 +753,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     key(49, " ")
                     try await settle(70)
                     try require(model.engine.completedCycles == index / 5, "Manual step \(index) counts cycles correctly")
+                    if index % 5 != 0 {
+                        try require(model.engine.isIntroducingStage, "Step \(index) is followed by the card that turns the dial")
+                        key(49, " ")
+                        try await settle(70)
+                    }
                     if index == 5 {
                         try require(model.engine.isIntroducingCycle && model.engine.currentCycle == 2,
                                     "Completing a cycle shows the Cycle 2 card")

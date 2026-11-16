@@ -469,35 +469,128 @@ final class SessionEngineTests {
         Check.equal(engine.introductionDuration, 3)
         engine.begin(configuration(2), at: 0)
         Check.isTrue(engine.isIntroducingCycle)
+        Check.isFalse(engine.isIntroducingStage)
         Check.equal(engine.currentCycle, 1)
         Check.equal(engine.stageIndex, 0)
         Check.isFalse(engine.tick(at: 2.9))
         Check.isTrue(engine.isIntroducingCycle)
         Check.equal(engine.remainingSeconds, 60)
         Check.equal(engine.activeSeconds, 0)
-        Check.isTrue(engine.tick(at: 3.1))
+        // After three seconds the cycle card gives way to step 1's own card, the cycle of ages.
+        Check.isFalse(engine.tick(at: 3))
         Check.isFalse(engine.isIntroducingCycle)
+        Check.isTrue(engine.isIntroducingStage)
+        Check.equal(engine.stageIndex, 0)
+        Check.isFalse(engine.tick(at: 5.9))
+        Check.isTrue(engine.isIntroducingStage)
+        Check.isTrue(engine.tick(at: 6))
+        Check.isFalse(engine.isIntroducing)
         Check.equal(engine.stageIndex, 0)
         Check.equal(engine.remainingSeconds, 60)
         Check.equal(engine.transitionCount, 0)
-        engine.tick(at: 63.1)
+        engine.tick(at: 66)
         Check.equal(engine.stageIndex, 1)
-        for now in [64.0, 65, 66, 67] { engine.nextStage(at: now) }
+        // Each later step opens with a card of its own: Space begins the step, and Space again moves on.
+        for now in stride(from: 67.0, through: 74, by: 1) { engine.nextStage(at: now) }
         // Completing cycle 1 introduces cycle 2 before its first step.
         Check.equal(engine.completedCycles, 1)
         Check.isTrue(engine.isIntroducingCycle)
+        Check.isFalse(engine.isIntroducingStage)
         Check.equal(engine.currentCycle, 2)
         Check.equal(engine.stageIndex, 0)
-        Check.isFalse(engine.tick(at: 69))
-        Check.isTrue(engine.tick(at: 70))
-        Check.isFalse(engine.isIntroducingCycle)
-        // 60 s for step 1, then 0.9 + 1 + 1 + 1 s; neither title card counts.
-        Check.equal(engine.activeSeconds, 63.9, accuracy: 1e-9)
-        for now in [71.0, 72, 73, 74, 75] { engine.nextStage(at: now) }
-        // The last cycle ends in completion, never another title card.
+        Check.isFalse(engine.tick(at: 76.9))
+        Check.isTrue(engine.isIntroducingCycle)
+        Check.isFalse(engine.tick(at: 77))
+        Check.isTrue(engine.isIntroducingStage)
+        Check.isTrue(engine.tick(at: 80))
+        Check.isFalse(engine.isIntroducing)
+        // 60 s for step 1, then 1 s for each of steps 2 to 5; no card counts.
+        Check.equal(engine.activeSeconds, 64, accuracy: 1e-9)
+        for now in stride(from: 81.0, through: 89, by: 1) { engine.nextStage(at: now) }
+        // The last cycle ends in completion, never another card.
         Check.equal(engine.phase, .complete)
-        Check.isFalse(engine.isIntroducingCycle)
+        Check.isFalse(engine.isIntroducing)
         Check.equal(engine.currentCycle, 2)
+    }
+
+    func testEveryLaterStepOpensWithACardOutsidePracticeTime() {
+        var engine = SessionEngine()
+        engine.begin(configuration(2), at: 0)
+        Check.isTrue(engine.tick(at: 6))
+        // Step 1's time runs out: step 2's card shows, and step 2 waits with its full time.
+        Check.isTrue(engine.tick(at: 66))
+        Check.isTrue(engine.isIntroducingStage)
+        Check.isTrue(engine.isIntroducing)
+        Check.isFalse(engine.isIntroducingCycle)
+        Check.equal(engine.stageIndex, 1)
+        Check.equal(engine.remainingSeconds, 60)
+        Check.equal(engine.transitionCount, 1)
+        Check.isFalse(engine.tick(at: 68.9))
+        Check.equal(engine.remainingSeconds, 60)
+        Check.equal(engine.activeSeconds, 60)
+        Check.isTrue(engine.tick(at: 69))
+        Check.isFalse(engine.isIntroducing)
+        Check.equal(engine.stageIndex, 1)
+        Check.equal(engine.remainingSeconds, 60)
+        // A key press at the card's end is the same single transition.
+        Check.isFalse(engine.nextStage(at: 69.05, eventTime: 69.05))
+        Check.equal(engine.stageIndex, 1)
+        // Space ends a step early; on its card, Space begins the next step at once, with its full time.
+        Check.isTrue(engine.nextStage(at: 73))
+        Check.isTrue(engine.isIntroducingStage)
+        Check.equal(engine.stageIndex, 2)
+        Check.isTrue(engine.nextStage(at: 74))
+        Check.isFalse(engine.isIntroducing)
+        Check.equal(engine.stageIndex, 2)
+        Check.equal(engine.remainingSeconds, 60)
+        Check.isFalse(engine.nextStage(at: 74.5, isRepeat: true))
+        // Pausing on a card begins its step, which waits with its full time.
+        Check.isTrue(engine.nextStage(at: 83))
+        engine.pause(at: 84)
+        Check.equal(engine.phase, .paused)
+        Check.isFalse(engine.isIntroducing)
+        Check.equal(engine.stageIndex, 3)
+        Check.equal(engine.remainingSeconds, 60)
+        engine.resume(at: 93)
+        engine.tick(at: 103)
+        Check.equal(engine.remainingSeconds, 50)
+        // 60 + 4 + 9 s of steps, 9 s paused with step 4, and 10 s of it; no card counts.
+        Check.equal(engine.activeSeconds, 92)
+        Check.equal(engine.stepSeconds, [[60, 4, 9, 19, 0]])
+        // Without cards, each step follows the last at once.
+        var direct = stageEngine()
+        direct.begin(configuration(), at: 0)
+        Check.isFalse(direct.isIntroducing)
+        Check.isTrue(direct.nextStage(at: 5))
+        Check.isFalse(direct.isIntroducingStage)
+        Check.equal(direct.stageIndex, 1)
+    }
+
+    func testTimeIsRecordedForEachStepOfEachCycle() {
+        var engine = stageEngine()
+        engine.begin(configuration(2), at: 0)
+        Check.equal(engine.stepSeconds, [[0, 0, 0, 0, 0]])
+        engine.tick(at: 60)                  // Step 1 runs its full minute.
+        engine.nextStage(at: 70)             // Step 2: 10 s, then Space.
+        engine.pause(at: 75)                 // Step 3: 5 s, 20 s paused with it, and 5 s more.
+        engine.resume(at: 95)
+        engine.nextStage(at: 100)
+        engine.tick(at: 110)                 // Step 4: 10 s, 100 s away, and 5 s more.
+        engine.setPresent(false, at: 110)
+        engine.setPresent(true, at: 210)
+        engine.resume(at: 210)
+        engine.nextStage(at: 215)
+        engine.nextStage(at: 225)            // Step 5: 10 s, which completes cycle 1.
+        Check.equal(engine.stepSeconds, [[60, 10, 30, 15, 10], [0, 0, 0, 0, 0]])
+        for now in [226.0, 227, 228, 229, 230] { engine.nextStage(at: now) }
+        Check.equal(engine.phase, .complete)
+        Check.equal(engine.stepSeconds, [[60, 10, 30, 15, 10], [1, 1, 1, 1, 1]])
+        Check.equal(engine.stepSeconds.joined().reduce(0, +), engine.activeSeconds)
+        // A new practice starts its record afresh.
+        engine.begin(configuration(), at: 300)
+        Check.equal(engine.stepSeconds, [[0, 0, 0, 0, 0]])
+        engine.reset()
+        Check.equal(engine.stepSeconds, [])
     }
 
     func testSpaceOnTitleCardBeginsFirstStepOnly() {
@@ -516,13 +609,13 @@ final class SessionEngineTests {
     func testTitleCardEndAndSpaceAtSameBoundaryIsOneTransition() {
         var engine = SessionEngine()
         engine.begin(configuration(), at: 0)
-        Check.isTrue(engine.tick(at: 3))
-        Check.isFalse(engine.nextStage(at: 3.05, eventTime: 3.05))
+        Check.isTrue(engine.tick(at: 6))
+        Check.isFalse(engine.nextStage(at: 6.05, eventTime: 6.05))
         Check.equal(engine.stageIndex, 0)
-        // A press made during the card but delivered after it ended is stale.
-        Check.isFalse(engine.nextStage(at: 3.3, eventTime: 2.9))
+        // A press made during the cards but delivered after they ended is stale.
+        Check.isFalse(engine.nextStage(at: 6.3, eventTime: 5.9))
         Check.equal(engine.stageIndex, 0)
-        Check.isTrue(engine.nextStage(at: 3.4, eventTime: 3.4))
+        Check.isTrue(engine.nextStage(at: 6.4, eventTime: 6.4))
         Check.equal(engine.stageIndex, 1)
     }
 
@@ -604,33 +697,48 @@ final class SessionEngineTests {
     func testFreestyleStepsLastUntilThePractitionerMovesOn() {
         var engine = SessionEngine()
         engine.begin(try! SessionConfiguration(freestyleCycles: 2), at: 0)
-        // The card that opens each cycle still lasts three seconds.
+        // The cards that open each cycle still last three seconds each.
         Check.isTrue(engine.isIntroducingCycle)
         Check.isFalse(engine.tick(at: 2.9))
-        Check.isTrue(engine.tick(at: 3))
-        Check.isFalse(engine.isIntroducingCycle)
+        Check.isFalse(engine.tick(at: 3))
+        Check.isTrue(engine.isIntroducingStage)
+        Check.isTrue(engine.tick(at: 6))
+        Check.isFalse(engine.isIntroducing)
         // A step never ends by itself, however long it is given.
         Check.isFalse(engine.tick(at: 4000))
         Check.equal(engine.phase, .running)
         Check.equal(engine.stageIndex, 0)
         Check.equal(engine.progress, 0)
-        Check.equal(engine.activeSeconds, 3997)
+        Check.equal(engine.activeSeconds, 3994)
         Check.isTrue(engine.nextStage(at: 4010))
         Check.equal(engine.stageIndex, 1)
-        Check.equal(engine.activeSeconds, 4007)
+        Check.isTrue(engine.isIntroducingStage)
+        Check.equal(engine.activeSeconds, 4004)
         Check.isFalse(engine.nextStage(at: 4010.5, isRepeat: true))
-        for now in [4020.0, 4030, 4040, 4050] { engine.nextStage(at: now) }
+        // Each later step's card lasts three seconds too; then the step waits for Space.
+        Check.isTrue(engine.tick(at: 4013))
+        for now in [4020.0, 4030, 4040] {
+            engine.nextStage(at: now)
+            Check.isTrue(engine.isIntroducingStage)
+            Check.isTrue(engine.tick(at: now + 3))
+        }
+        engine.nextStage(at: 4050)
         Check.equal(engine.completedCycles, 1)
         Check.isTrue(engine.isIntroducingCycle)
         Check.equal(engine.currentCycle, 2)
-        Check.isTrue(engine.tick(at: 4053))
+        Check.isTrue(engine.tick(at: 4056))
         engine.pause(at: 4060)
         engine.resume(at: 4100)
-        for now in [4110.0, 4120, 4130, 4140, 4150] { engine.nextStage(at: now) }
+        for now in [4110.0, 4120, 4130, 4140] {
+            engine.nextStage(at: now)
+            engine.tick(at: now + 3)
+        }
+        engine.nextStage(at: 4150)
         Check.equal(engine.phase, .complete)
         Check.equal(engine.completedCycles, 2)
-        // 3997 + 50 s in cycle 1, then 7 + 40 paused + 50 s in cycle 2; neither card counts.
-        Check.equal(engine.activeSeconds, 4144)
+        // 4004 + 4 × 7 s in cycle 1, then 4 + 40 paused + 10 + 4 × 7 s in cycle 2; no card counts.
+        Check.equal(engine.activeSeconds, 4114)
+        Check.equal(engine.stepSeconds, [[4004, 7, 7, 7, 7], [54, 7, 7, 7, 7]])
     }
 
     func testFreestylePreferencesKeepTheTimeLastEntered() {

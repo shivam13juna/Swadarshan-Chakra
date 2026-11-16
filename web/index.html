@@ -148,6 +148,34 @@
             <p id="setup-note" class="setup-note"></p>
           </div>
         </form>
+
+        <!-- How the practice's time was spent, beside the circle on completion (TimeSummaryPanel) -->
+        <section id="time-summary" class="summary-panel" aria-labelledby="time-summary-title">
+          <div class="setup-intro">
+            <p class="eyebrow">Your time</p>
+            <h2 id="time-summary-title" class="setup-title">How you spent it.</h2>
+            <p class="summary-note">The time practiced in each step, with each cycle's total and its average per step. Pauses with a step count; the cards and time away don't.</p>
+          </div>
+          <div class="setup-rule" aria-hidden="true"></div>
+          <div class="time-table-wrap">
+            <table class="time-table">
+              <thead>
+                <tr>
+                  <th scope="col" title="The cycle">Cycle</th>
+                  <th scope="col" title="Step 1: बीज रूप — परमधाम में">01</th>
+                  <th scope="col" title="Step 2: विश्व महाराजन — सतयुग में">02</th>
+                  <th scope="col" title="Step 3: पूज्य स्वरूप — द्वापर युग में">03</th>
+                  <th scope="col" title="Step 4: परम पवित्र ब्राह्मण — संगम युग में">04</th>
+                  <th scope="col" title="Step 5: फरिश्ता स्वरूप">05</th>
+                  <th scope="col" title="This cycle's average time per step">Average <br class="title-break">per step</th>
+                  <th scope="col" title="The time practiced in this cycle, in all">Total <br class="title-break">this cycle</th>
+                </tr>
+              </thead>
+              <tbody id="time-rows"></tbody>
+              <tfoot id="time-all"></tfoot>
+            </table>
+          </div>
+        </section>
       </div>
 
       <footer class="overview-footer">
@@ -172,6 +200,21 @@
       <div class="cycle-card-center">
         <img id="cycle-chakra" class="cycle-chakra" src="images/icon.png" width="256" height="256" alt="">
         <h2 id="cycle-card-title" class="cycle-card-title">Cycle 1</h2>
+      </div>
+    </section>
+
+    <!-- The card between two steps: the cycle of ages, its hand turning to the next step (DialCardView) -->
+    <section id="dial-card" class="view dial-card" aria-label="Between steps">
+      <div class="corner-bar">
+        <div class="counters"><p id="dial-cycle-counter" class="capsule"></p></div>
+        <button type="button" class="artwork-button icon-button" data-action="fullscreen" aria-label="Enter full screen" title="Full screen (F)">
+          <svg class="icon icon-enter" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+          <svg class="icon icon-exit" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M14 10h-4v4M2 10h4v4"/></svg>
+        </button>
+      </div>
+      <div id="yuga-dial" class="yuga-dial" role="img">
+        <img class="yuga-dial-face" src="images/yuga-chakra.webp" width="512" height="512" alt="">
+        <img id="yuga-dial-hand" class="yuga-dial-hand" src="images/hour-hand.webp" width="181" height="543" alt="">
       </div>
     </section>
 

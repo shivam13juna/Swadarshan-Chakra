@@ -16,12 +16,16 @@ struct MeditationView: View {
                 } else if model.engine.isIntroducingCycle {
                     CycleIntroductionView(model: model, icon: artwork.brandIcon, topInset: topInset)
                         .transition(.opacity)
+                } else if model.engine.isIntroducingStage {
+                    DialCardView(model: model, engine: model.engine, artwork: artwork, topInset: topInset)
+                        .transition(.opacity)
                 } else {
                     FullScreenStageView(model: model, engine: model.engine, artwork: artwork, topInset: topInset)
                         .transition(.opacity)
                 }
             }
-            // Cross-fade between the cycle card and the pictures.
+            // Cross-fade between the cards and the pictures, and from the cycle card to the first step's card.
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.5), value: model.engine.isIntroducing)
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.5), value: model.engine.isIntroducingCycle)
             .disabled(model.engine.phase == .confirming)
             .allowsHitTesting(model.engine.phase != .confirming)
@@ -48,7 +52,13 @@ struct MeditationView: View {
                                 .frame(width: compact ? 286 : 326)
                         }.frame(maxHeight: .infinity)
                     } else {
-                        OrbitView(model: model, artwork: artwork).frame(maxWidth: .infinity, maxHeight: .infinity)
+                        // Completion: beside the circle, how the practice's time was spent.
+                        HStack(spacing: compact ? 22 : 40) {
+                            OrbitView(model: model, artwork: artwork).frame(maxWidth: .infinity, maxHeight: .infinity)
+                            // Wide enough on a large display for every column title to fit on one line.
+                            TimeSummaryPanel(engine: model.engine, compact: compact)
+                                .frame(width: compact ? 372 : min(560, max(470, geometry.size.width * 0.36)))
+                        }.frame(maxHeight: .infinity)
                     }
                     HStack {
                         if model.engine.phase == .ready {

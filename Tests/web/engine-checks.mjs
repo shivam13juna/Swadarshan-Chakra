@@ -93,17 +93,23 @@ check("time text", () => {
   equal(TimeText.approximateDuration(40), "40 sec", "exact");
 });
 
-check("each cycle opens with a three-second card that is not practice time", () => {
+check("each cycle opens with a three-second card, then step 1's own card, neither practice time", () => {
   const engine = new SessionEngine();
   engine.begin(perStep(2, 0, 10), 100);
   equal(engine.isIntroducingCycle, true, "card at begin");
+  equal(engine.isIntroducingStage, false, "the cycle card first");
   equal(engine.tick(102.9), false, "card still showing");
-  equal(engine.tick(103), true, "card ends");
-  equal(engine.isIntroducingCycle, false, "step begins");
+  equal(engine.tick(103), false, "the cycle card gives way");
+  equal(engine.isIntroducingCycle, false, "to step 1's card");
+  equal(engine.isIntroducingStage, true, "the cycle of ages");
+  equal(engine.stageIndex, 0, "before step 1");
+  equal(engine.tick(105.9), false, "still showing");
+  equal(engine.tick(106), true, "cards end");
+  equal(engine.isIntroducing, false, "step begins");
   equal(engine.remainingSeconds, 10, "full first step");
-  engine.tick(108);
+  engine.tick(111);
   near(engine.remainingSeconds, 5, "counting down");
-  near(engine.activeSeconds, 5, "card not counted");
+  near(engine.activeSeconds, 5, "cards not counted");
 });
 
 check("steps advance one at a time and cycles begin with a card", () => {
@@ -116,12 +122,88 @@ check("steps advance one at a time and cycles begin with a card", () => {
   }
   const withCard = new SessionEngine();
   withCard.begin(perStep(2, 0, 10), 0);
-  withCard.tick(3);
-  for (let step = 1; step <= 5; step += 1) withCard.tick(3 + step * 10);
+  withCard.tick(6);
+  let now = 6;
+  for (let step = 1; step < 5; step += 1) {
+    now += 10;
+    equal(withCard.tick(now), true, `step ${step} ends`);
+    equal(withCard.isIntroducingStage, true, `the card before step ${step + 1}`);
+    equal(withCard.stageIndex, step, "leads to the next step");
+    equal(withCard.remainingSeconds, 10, "which waits with its full time");
+    now += 3;
+    equal(withCard.tick(now), true, "the card ends");
+  }
+  equal(withCard.tick(now + 10), true, "step 5 ends");
   equal(withCard.completedCycles, 1, "one cycle");
   equal(withCard.stageIndex, 0, "back to the first form");
   equal(withCard.isIntroducingCycle, true, "second cycle card");
+  equal(withCard.isIntroducingStage, false, "not a card between steps");
   equal(withCard.currentCycle, 2, "cycle 2");
+  near(withCard.activeSeconds, 50, "no card counted");
+});
+
+check("each later step opens with a three-second card that is not practice time", () => {
+  const engine = new SessionEngine();
+  engine.begin(perStep(2, 1), 0);
+  equal(engine.tick(6), true, "the cycle's cards end");
+  equal(engine.tick(66), true, "step 1 ends");
+  equal(engine.isIntroducingStage, true, "card between steps");
+  equal(engine.isIntroducing, true, "a card");
+  equal(engine.isIntroducingCycle, false, "not a cycle card");
+  equal(engine.stageIndex, 1, "leads to step 2");
+  equal(engine.remainingSeconds, 60, "step 2 waits with its full time");
+  equal(engine.tick(68.9), false, "card still showing");
+  near(engine.activeSeconds, 60, "card not counted");
+  equal(engine.tick(69), true, "card ends");
+  equal(engine.isIntroducing, false, "step 2 begins");
+  equal(engine.nextStage(69.05, { eventTime: 69.05 }), false, "a press at the card's end is the same transition");
+  equal(engine.nextStage(73), true, "Space ends step 2 early");
+  equal(engine.isIntroducingStage, true, "step 3's card");
+  equal(engine.nextStage(74), true, "Space on the card begins step 3");
+  equal(engine.isIntroducing, false, "card gone");
+  equal(engine.remainingSeconds, 60, "full step 3");
+  equal(engine.nextStage(74.5, { isRepeat: true }), false, "key repeat");
+  equal(engine.nextStage(83), true, "on to step 4's card");
+  engine.pause(84);
+  equal(engine.phase, "paused", "pausing on the card");
+  equal(engine.stageIndex, 3, "begins step 4");
+  equal(engine.remainingSeconds, 60, "paused with its full time");
+  engine.resume(93);
+  engine.tick(103);
+  near(engine.remainingSeconds, 50, "counting down");
+  near(engine.activeSeconds, 92, "60 + 4 + 9 + 9 paused + 10; no card counted");
+  equal(JSON.stringify(engine.stepSeconds), "[[60,4,9,19,0]]", "step by step");
+  const direct = stageEngine();
+  direct.begin(perStep(1, 1), 0);
+  equal(direct.nextStage(5), true, "without cards");
+  equal(direct.isIntroducingStage, false, "no card");
+  equal(direct.stageIndex, 1, "straight to step 2");
+});
+
+check("the time of each step of each cycle is recorded", () => {
+  const engine = stageEngine();
+  engine.begin(perStep(2, 1), 0);
+  equal(JSON.stringify(engine.stepSeconds), "[[0,0,0,0,0]]", "an empty first cycle");
+  engine.tick(60);                    // Step 1 runs its full minute.
+  engine.nextStage(70);               // Step 2: 10 s, then Space.
+  engine.pause(75);                   // Step 3: 5 s, 20 s paused with it, and 5 s more.
+  engine.resume(95);
+  engine.nextStage(100);
+  engine.tick(110);                   // Step 4: 10 s, 100 s away, and 5 s more.
+  engine.setPresent(false, 110);
+  engine.setPresent(true, 210);
+  engine.resume(210);
+  engine.nextStage(215);
+  engine.nextStage(225);              // Step 5: 10 s, which completes cycle 1.
+  equal(JSON.stringify(engine.stepSeconds), "[[60,10,30,15,10],[0,0,0,0,0]]", "cycle 1, and cycle 2 begun");
+  for (const time of [226, 227, 228, 229, 230]) engine.nextStage(time);
+  equal(engine.phase, "complete", "complete");
+  equal(JSON.stringify(engine.stepSeconds), "[[60,10,30,15,10],[1,1,1,1,1]]", "both cycles");
+  near(engine.stepSeconds.flat().reduce((sum, seconds) => sum + seconds, 0), engine.activeSeconds, "adds up to the practiced time");
+  engine.begin(perStep(1, 1), 300);
+  equal(JSON.stringify(engine.stepSeconds), "[[0,0,0,0,0]]", "a new practice starts afresh");
+  engine.reset();
+  equal(engine.stepSeconds.length, 0, "none after a reset");
 });
 
 check("space on the card starts the cycle with a full first step", () => {
@@ -303,21 +385,33 @@ check("a freestyle step lasts until the practitioner moves on", () => {
   const engine = new SessionEngine();
   engine.begin(Config.freestyle(2), 0);
   equal(engine.tick(2.9), false, "card still showing");
-  equal(engine.tick(3), true, "card ends after three seconds");
+  equal(engine.tick(3), false, "the cycle card gives way to step 1's card");
+  equal(engine.tick(6), true, "the cards end after three seconds each");
   equal(engine.tick(4000), false, "a step never ends by itself");
   equal(engine.stageIndex, 0, "still step 1");
   equal(engine.progress, 0, "no progress to show");
-  equal(engine.activeSeconds, 3997, "all of it practiced");
+  equal(engine.activeSeconds, 3994, "all of it practiced");
   equal(engine.nextStage(4010), true, "Space moves on");
   equal(engine.stageIndex, 1, "step 2");
-  for (const time of [4020, 4030, 4040, 4050]) engine.nextStage(time);
+  equal(engine.isIntroducingStage, true, "its card first");
+  equal(engine.tick(4013), true, "the card lasts three seconds");
+  for (const time of [4020, 4030, 4040]) {
+    engine.nextStage(time);
+    equal(engine.tick(time + 3), true, "each card ends by itself");
+  }
+  engine.nextStage(4050);
   equal(engine.isIntroducingCycle, true, "cycle 2 card");
-  engine.tick(4053);
+  engine.tick(4056);
   engine.pause(4060);
   engine.resume(4100);
-  for (const time of [4110, 4120, 4130, 4140, 4150]) engine.nextStage(time);
+  for (const time of [4110, 4120, 4130, 4140]) {
+    engine.nextStage(time);
+    engine.tick(time + 3);
+  }
+  engine.nextStage(4150);
   equal(engine.phase, "complete", "complete");
-  equal(engine.activeSeconds, 4144, "practiced, with the pause");
+  equal(engine.activeSeconds, 4114, "practiced, with the pause; no card counted");
+  equal(JSON.stringify(engine.stepSeconds), "[[4004,7,7,7,7],[54,7,7,7,7]]", "step by step");
 });
 
 check("freestyle keeps the time last entered", () => {

@@ -14,7 +14,7 @@ let package = Package(
         .executableTarget(
             name: "SwadarshanChakra",
             dependencies: ["MeditationCore"],
-            resources: [.copy("Resources/Artwork"), .copy("Resources/Branding")]
+            resources: [.copy("Resources/Artwork"), .copy("Resources/Branding"), .copy("Resources/Dial")]
         ),
         // Runnable with Command Line Tools alone; no Xcode/XCTest installation required.
         .executableTarget(name: "CoreChecks", dependencies: ["MeditationCore"], path: "Tests/MeditationCoreTests")

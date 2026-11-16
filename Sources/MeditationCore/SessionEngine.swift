@@ -6,10 +6,12 @@ public struct SessionEngine: Sendable {
     public enum Phase: Equatable, Sendable { case ready, running, paused, confirming, complete }
     public enum Confirmation: Equatable, Sendable { case restart, end, quit }
 
-    /// Every cycle opens with a short "Cycle N" title card. It is not practice time: the first
-    /// step's countdown starts only when the card ends, so no step is ever shortened by it.
+    /// Every step opens with the cycle of ages, its hand on that step's place, turning there from the
+    /// last step's; a cycle's first step has a "Cycle N" card before that. Cards are not practice time:
+    /// a step's countdown starts only when its cards end, so no step is ever shortened by one.
     public static let standardIntroduction: TimeInterval = 3
 
+    /// How long each card lasts; 0 goes straight from step to step, without cards.
     public let introductionDuration: TimeInterval
     public private(set) var phase: Phase = .ready
     public private(set) var configuration: SessionConfiguration = .standard
@@ -18,8 +20,10 @@ public struct SessionEngine: Sendable {
     public private(set) var remainingSeconds: TimeInterval = 60
     public private(set) var introductionRemaining: TimeInterval = 0
     /// The time practiced: every running step, and every pause spent with the practice (`isPresent`).
-    /// Cycle cards, confirmations, and time away never count.
+    /// Cards, confirmations, and time away never count.
     public private(set) var activeSeconds: TimeInterval = 0
+    /// The same time, step by step: `stepSeconds[cycle][step]`, for every cycle begun so far.
+    public private(set) var stepSeconds: [[TimeInterval]] = []
     public private(set) var pendingConfirmation: Confirmation?
     public private(set) var transitionCount = 0
     /// Whether the practitioner is with the practice: its window is in front, and the Mac is awake and
@@ -41,7 +45,14 @@ public struct SessionEngine: Sendable {
     }
     public var currentStage: Stage { Stage.all[stageIndex] }
     public var currentCycle: Int { min(completedCycles + 1, configuration.cycles) }
-    public var isIntroducingCycle: Bool { phase == .running && introductionRemaining > 0 }
+    /// A card is showing, before the step at `stageIndex`.
+    public var isIntroducing: Bool { phase == .running && introductionRemaining > 0 }
+    /// The "Cycle N" card, the first of the two before a cycle's first step.
+    public var isIntroducingCycle: Bool {
+        isIntroducing && stageIndex == 0 && introductionRemaining > introductionDuration
+    }
+    /// The card just before the step at `stageIndex`: the cycle of ages, its hand on that step's place.
+    public var isIntroducingStage: Bool { isIntroducing && !isIntroducingCycle }
     /// The share of this step's time already practiced, from 0 to 1. A freestyle step has no time to share.
     public var progress: Double {
         guard configuration.isTimed else { return 0 }
@@ -52,7 +63,8 @@ public struct SessionEngine: Sendable {
         reset()
         self.configuration = configuration
         remainingSeconds = configuration.secondsPerStage
-        introductionRemaining = introductionDuration
+        introductionRemaining = cardTime(before: 0)
+        stepSeconds = [Self.noTime]
         lastSample = now
         stageStartedAt = now
         phase = .running
@@ -71,7 +83,7 @@ public struct SessionEngine: Sendable {
             introductionRemaining = max(0, introductionRemaining - max(0, now - lastSample))
             lastSample = max(lastSample, now)
             guard introductionRemaining == 0 else { return false }
-            // The card has ended; the cycle's first step starts now with its full time.
+            // The cards have ended; their step starts now with its full time.
             restartClock(at: now, automatic: true)
             return true
         }
@@ -101,7 +113,7 @@ public struct SessionEngine: Sendable {
         if tick(at: now, maximumGap: maximumGap) { return true }
         guard phase == .running else { return false }
         if introductionRemaining > 0 {
-            // Space on a title card begins that cycle's first step immediately, with its full time.
+            // Space on a card begins its step immediately, with its full time, skipping any card still to come.
             introductionRemaining = 0
             restartClock(at: now, automatic: false)
             return true
@@ -117,7 +129,7 @@ public struct SessionEngine: Sendable {
         }
         guard phase == .running else { return }
         if introductionRemaining > 0 {
-            // Pausing on a title card begins its cycle; the first step waits with its full time.
+            // Pausing on a card begins its step, which waits with its full time.
             introductionRemaining = 0
         } else {
             // Pausing never traverses a stage, even if its deadline has just passed.
@@ -209,15 +221,30 @@ public struct SessionEngine: Sendable {
         let delta = max(0, now - lastSample)
         // A timed step counts only up to its end; a freestyle step lasts as long as it is given.
         let practiced = configuration.isTimed ? min(remainingSeconds, delta) : delta
-        activeSeconds += practiced
+        record(practiced)
         remainingSeconds = max(0, remainingSeconds - practiced)
         lastSample = max(lastSample, now)
     }
 
     private mutating func countPause(until now: TimeInterval) {
         guard let since = pausedSince else { return }
-        activeSeconds += max(0, now - since)
+        record(max(0, now - since))
         pausedSince = max(since, now)
+    }
+
+    /// Practice belongs to the step on view: this cycle's row, this step's place in it.
+    private mutating func record(_ seconds: TimeInterval) {
+        activeSeconds += seconds
+        guard stepSeconds.indices.contains(completedCycles) else { return }
+        stepSeconds[completedCycles][stageIndex] += seconds
+    }
+
+    private static let noTime = [TimeInterval](repeating: 0, count: Stage.all.count)
+
+    /// A cycle's first step opens with two cards, "Cycle N" and then the cycle of ages; every later
+    /// step with the cycle of ages alone.
+    private func cardTime(before stage: Int) -> TimeInterval {
+        stage == 0 ? 2 * introductionDuration : introductionDuration
     }
 
     private mutating func advance(at now: TimeInterval, automatic: Bool) {
@@ -230,10 +257,12 @@ public struct SessionEngine: Sendable {
                 return
             }
             stageIndex = 0
-            introductionRemaining = introductionDuration
+            stepSeconds.append(Self.noTime)
         } else {
             stageIndex += 1
         }
+        // The next step opens with its cards; its countdown starts when they end.
+        introductionRemaining = cardTime(before: stageIndex)
         remainingSeconds = configuration.secondsPerStage
         restartClock(at: now, automatic: automatic)
     }

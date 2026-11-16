@@ -23,7 +23,10 @@ enum PreviewRenderer {
                     ("compact-total-time", 1024, 640), ("total-time-too-short", 1024, 640),
                     ("freestyle", 1440, 900), ("compact-freestyle", 1024, 640), ("freestyle-running", 1440, 900),
                     ("freestyle-paused", 1024, 640), ("freestyle-complete", 1440, 900),
-                    ("no-countdown-bar", 1440, 900)
+                    ("no-countdown-bar", 1440, 900), ("between-steps", 1440, 900), ("turning-hand", 1440, 900),
+                    ("wide-between-steps", 2560, 1080), ("compact-between-steps", 1024, 640),
+                    ("portrait-between-steps", 900, 1440), ("first-step-card", 1440, 900),
+                    ("summary", 1440, 900), ("compact-summary", 1024, 640)
                 ]
                 for (name, width, height) in scenarios {
                     let model = makeModel(name)
@@ -35,7 +38,10 @@ enum PreviewRenderer {
                     window.contentView = host
                     window.orderFront(nil)
                     host.layoutSubtreeIfNeeded()
-                    try await Task.sleep(nanoseconds: 350_000_000)
+                    // A card between steps is captured once its hand has turned, or, for "turning-hand",
+                    // partway through the two-second turn from Sat Yuga to Dwapar Yuga.
+                    let settle: UInt64 = name == "turning-hand" ? 1_200 : (Self.turns[name] == nil ? 350 : 2_600)
+                    try await Task.sleep(nanoseconds: settle * 1_000_000)
                     guard host.bounds.size == NSSize(width: width, height: height) else {
                         throw NSError(domain: "Preview", code: 1, userInfo: [NSLocalizedDescriptionKey: "Layout exceeded the requested display size for \(name)"])
                     }
@@ -59,10 +65,55 @@ enum PreviewRenderer {
         }
     }
 
+    /// A finished practice of a minute per step whose steps took different times: most their full
+    /// minute, some moved on early with Space, some paused 45 s longer with the practitioner there.
+    private static func finishedPractice(cycles: Int) -> SessionEngine {
+        var engine = SessionEngine(introductionDuration: 0)
+        engine.begin(try! SessionConfiguration(cycles: cycles, minutesPerStep: 1), at: 0)
+        var now = 0.0
+        for step in 0..<(cycles * Stage.all.count) {
+            switch step % 7 {
+            case 2, 6:
+                now += step % 7 == 2 ? 38 : 51
+                engine.nextStage(at: now)
+            case 4:
+                engine.pause(at: now + 20)
+                engine.resume(at: now + 65)
+                now += 105
+                engine.tick(at: now)
+            default:
+                now += 60
+                engine.tick(at: now)
+            }
+        }
+        return engine
+    }
+
+    /// The cards between steps, by the step each one turns the dial to.
+    private static let turns = ["between-steps": 1, "turning-hand": 2, "wide-between-steps": 2,
+                                "compact-between-steps": 3, "portrait-between-steps": 4]
+
     private static func makeModel(_ name: String) -> SessionModel {
         let setupScreens = ["ready", "compact-ready", "invalid", "long-duration", "zero-duration",
                             "total-time", "compact-total-time", "total-time-too-short", "freestyle", "compact-freestyle"]
         let defaults = UserDefaults(suiteName: "com.swadarshan.chakra.previews")!
+        if let stage = turns[name] {
+            var engine = SessionEngine()
+            engine.begin(try! SessionConfiguration(cycles: 3, minutesPerStep: 1), at: 0)
+            // Space begins the step on each card, then moves on to the next step's card.
+            for now in 1...(2 * stage) { engine.nextStage(at: Double(now)) }
+            return SessionModel(defaults: defaults, automaticTicks: false, initialEngine: engine)
+        }
+        if name == "first-step-card" {
+            var engine = SessionEngine()
+            engine.begin(try! SessionConfiguration(cycles: 3, minutesPerStep: 1), at: 0)
+            engine.tick(at: 3.5)   // The cycle card has given way to step 1's own card.
+            return SessionModel(defaults: defaults, automaticTicks: false, initialEngine: engine)
+        }
+        if name.hasSuffix("summary") {
+            return SessionModel(defaults: defaults, automaticTicks: false,
+                                initialEngine: finishedPractice(cycles: name == "summary" ? 3 : 30))
+        }
         if name.hasPrefix("freestyle-") {
             // Freestyle steps, without the card that opens each cycle: no countdown, and no bar.
             var engine = SessionEngine(introductionDuration: 0)
@@ -78,12 +129,13 @@ enum PreviewRenderer {
             var engine = SessionEngine()
             engine.begin(try! SessionConfiguration(cycles: 3, minutesPerStep: 1), at: 0)
             if name != "cycle-intro" && name != "compact-cycle-intro" {
-                for now in 1...6 { engine.nextStage(at: Double(now)) }   // Cycle 1, then the next card.
+                // Cycle 1, each step begun from its card by Space, then the next cycle's card.
+                for now in 1...10 { engine.nextStage(at: Double(now)) }
             }
             if name == "second-cycle-paused" {
-                engine.nextStage(at: 7)
-                engine.tick(at: 22)
-                engine.pause(at: 22)
+                engine.nextStage(at: 11)
+                engine.tick(at: 26)
+                engine.pause(at: 26)
             }
             return SessionModel(defaults: defaults, automaticTicks: false, initialEngine: engine)
         }
