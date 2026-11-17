@@ -24,7 +24,7 @@ struct DialCardView: View {
                 MeditationBackground()
 
                 YugaDial(face: artwork.dialFace, hand: artwork.dialHand, angle: turned ? to : from,
-                         side: min(520, max(220, min(size.width, size.height) * 0.48)))
+                         side: min(780, max(330, min(size.width, size.height) * 0.72)))
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Step \(engine.stageIndex + 1) of 5. On the cycle of ages, the hand \(from == to ? "points" : "turns") to \(YugaDial.places[engine.stageIndex]).")
                     .accessibilityIdentifier("dial-card")

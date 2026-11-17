@@ -978,7 +978,9 @@ button { cursor: pointer; }
 }
 
 .yuga-dial {
-  --dial: clamp(220px, 48vmin, 520px);
+  /* As in the app, 72% of the window's shorter side, from 330px to 780px. On the narrowest phones it
+     keeps a 16px margin, and on a short window, such as a phone on its side, it stays below the corner box. */
+  --dial: min(clamp(min(330px, 100vw - 32px), 72vmin, 780px), 100vh - 2 * (var(--edge) + 48px));
   position: relative;
   flex: none;
   width: var(--dial);
