@@ -27,7 +27,8 @@
   <div class="background" aria-hidden="true"></div>
 
   <main id="app" data-phase="ready">
-    <!-- Setup and completion (MeditationView.overview) -->
+    <!-- Setup and completion (MeditationView.overview). Setup scrolls down to the journey; on completion
+         the journey takes the circle's place, beside the practice's own time. -->
     <section id="overview" class="view overview is-visible" aria-labelledby="brand-name">
       <header class="overview-header">
         <span class="brand-mark" aria-hidden="true"><img src="images/icon.png" width="256" height="256" alt=""></span>
@@ -36,144 +37,245 @@
           <p class="brand-latin">Swadarshan Chakra</p>
         </div>
         <p class="status"><span class="status-dot" aria-hidden="true"></span><span id="status-label">Ready when you are</span></p>
+        <!-- Today's practice so far; it leads down to the journey (MeditationView's todayButton) -->
+        <button id="today-button" type="button" class="quiet-button header-button today-button" data-action="journey" title="Today's practice so far. Your journey is below: click, scroll down, or press J.">
+          <span class="today-label">Today</span>
+          <span id="today-practice" class="today-practice"><span id="today-time" class="today-time"></span><span class="today-dot" aria-hidden="true">·</span><span class="cycle-count"><svg class="icon cycle-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.5a5.5 5.5 0 1 1-5.5-5.5h2.5M8.6 1.6 11 4l-2.4 2.4"/></svg><span id="today-cycles"></span></span></span>
+          <span id="today-none" class="today-none">No practice yet</span>
+          <svg class="icon today-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6.5l4 4 4-4"/></svg>
+        </button>
         <button type="button" class="quiet-button icon-button" data-action="fullscreen" aria-label="Enter full screen" title="Full screen (F)">
           <svg class="icon icon-enter" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
           <svg class="icon icon-exit" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M14 10h-4v4M2 10h4v4"/></svg>
         </button>
       </header>
 
-      <div class="overview-body">
-        <div id="orbit" class="orbit is-preview" role="group" aria-label="Five spiritual forms, in clockwise order">
-          <svg class="orbit-rings" aria-hidden="true">
-            <ellipse id="ring" class="ring"/>
-            <ellipse id="ring-dashed" class="ring-dashed"/>
-            <g id="chevrons"></g>
-          </svg>
-          <img id="orbit-chakra" class="orbit-chakra" src="images/icon.png" width="256" height="256" alt="">
-          <div id="orbit-focus" class="orbit-focus">
-            <div id="active-focus" class="active-focus">
-              <p id="focus-eyebrow" class="eyebrow">Form 01 / 05</p>
-              <img id="focus-art" class="focus-art" src="art/form-1-small.jpg" alt="">
-              <p id="focus-title" class="focus-title" lang="hi"></p>
-              <p id="focus-context" class="focus-context" lang="hi"></p>
+      <div id="overview-scroll" class="overview-scroll">
+        <div class="overview-body">
+          <div id="orbit" class="orbit is-preview" role="group" aria-label="Five spiritual forms, in clockwise order">
+            <svg class="orbit-rings" aria-hidden="true">
+              <ellipse id="ring" class="ring"/>
+              <ellipse id="ring-dashed" class="ring-dashed"/>
+              <g id="chevrons"></g>
+            </svg>
+            <img id="orbit-chakra" class="orbit-chakra" src="images/icon.png" width="256" height="256" alt="">
+            <div id="orbit-focus" class="orbit-focus">
+              <div id="active-focus" class="active-focus">
+                <p id="focus-eyebrow" class="eyebrow">Form 01 / 05</p>
+                <img id="focus-art" class="focus-art" src="art/form-1-small.jpg" alt="">
+                <p id="focus-title" class="focus-title" lang="hi"></p>
+                <p id="focus-context" class="focus-context" lang="hi"></p>
+              </div>
             </div>
-            <div id="completion-focus" class="completion-focus" hidden>
-              <svg class="seal" viewBox="0 0 40 40" aria-hidden="true"><path id="seal-outline"/><path d="M14 20.5l4.2 4.2 8-8.7"/></svg>
-              <div>
-                <h2 class="completion-title">Meditation complete</h2>
-                <p id="completed-cycles" class="completion-cycles"></p>
+            <!-- "Your journey", in the open space at the foot of the circle: down to the journey -->
+            <button id="journey-cue" type="button" class="journey-cue" data-action="journey" title="Your journey is below: a calendar of your days, your trend, and the hours you practice (J)">
+              Your journey<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6.5l4 4 4-4"/></svg>
+            </button>
+          </div>
+
+          <form id="setup" class="setup-panel" novalidate>
+            <div class="setup-intro">
+              <p class="eyebrow">Your practice</p>
+              <h2 class="setup-title">Your quiet moment.</h2>
+              <p class="setup-subtitle">Five forms. One complete cycle.</p>
+            </div>
+            <div class="setup-rule" aria-hidden="true"></div>
+            <div class="setup-fields">
+              <div class="field">
+                <div class="field-row">
+                  <div class="field-label">
+                    <label class="field-title" for="cycles-input">Cycles</label>
+                    <p class="field-hint">1–108 rounds</p>
+                  </div>
+                  <div id="cycles-box" class="input-box stepper">
+                    <button type="button" class="stepper-button" data-step="-1" aria-label="Decrease cycles">
+                      <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6"/></svg>
+                    </button>
+                    <input id="cycles-input" class="number-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="cycles-error">
+                    <button type="button" class="stepper-button" data-step="1" aria-label="Increase cycles">
+                      <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6M5 2v6"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <p id="cycles-error" class="field-error" hidden>Enter a whole number from 1 to 108.</p>
+              </div>
+
+              <div class="field">
+                <div class="field-row">
+                  <div class="field-label">
+                    <div class="mode-select">
+                      <select id="timing-mode" aria-label="Set time" title="Set the time for each step, a total shared by every step, or no timer (freestyle)">
+                        <option value="perStep">Time per step</option>
+                        <option value="total">Total time</option>
+                        <option value="freestyle">Freestyle</option>
+                      </select>
+                      <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3"/></svg>
+                    </div>
+                    <p id="duration-hint" class="field-hint">For each form</p>
+                  </div>
+                  <div id="duration-box" class="input-box duration">
+                    <div class="duration-part">
+                      <input id="minutes-input" class="number-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="duration-error">
+                      <span class="unit" aria-hidden="true">min</span>
+                    </div>
+                    <span class="duration-colon" aria-hidden="true">:</span>
+                    <div class="duration-part">
+                      <input id="seconds-input" class="number-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="duration-error">
+                      <span class="unit" aria-hidden="true">sec</span>
+                    </div>
+                  </div>
+                </div>
+                <p id="duration-error" class="field-error" hidden></p>
+                <label id="countdown-bar-setting" class="checkbox field-option" title="A thin bar along the bottom of each step shows how much of its time is left. Untick to hide it.">
+                  <input id="shows-countdown-bar" type="checkbox">
+                  <span>Show countdown bar</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="summary">
+              <div class="summary-value"><p id="summary-label-1" class="label"></p><p id="summary-value-1" class="value"></p></div>
+              <span class="summary-divider" aria-hidden="true"></span>
+              <div class="summary-value"><p id="summary-label-2" class="label"></p><p id="summary-value-2" class="value"></p></div>
+            </div>
+
+            <div class="setup-actions">
+              <button id="begin-button" type="submit" class="gold-button begin-button">
+                <svg class="icon icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.6v10.8L13.2 8z"/></svg>
+                <span>Begin meditation</span>
+                <svg class="icon icon-return" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 3v5a2 2 0 0 1-2 2H4M6.5 7.5 4 10l2.5 2.5"/></svg>
+              </button>
+              <p id="setup-note" class="setup-note"></p>
+            </div>
+          </form>
+
+          <!-- The finished practice: that it's complete, its time against the plan, and how its time was
+               spent (TimeSummaryPanel) -->
+          <section id="time-summary" class="summary-panel" aria-labelledby="completion-title">
+            <div class="completion">
+              <div class="completion-head">
+                <svg class="seal" viewBox="0 0 40 40" aria-hidden="true"><path id="seal-outline"/><path d="M14 20.5l4.2 4.2 8-8.7"/></svg>
+                <div>
+                  <h2 id="completion-title" class="completion-title">Meditation complete</h2>
+                  <p id="completed-cycles" class="completion-cycles"></p>
+                </div>
               </div>
               <div class="completion-summary">
                 <div><p class="label">Practiced</p><p id="practiced-time" class="value"></p></div>
                 <span id="planned-divider" class="completion-divider" aria-hidden="true"></span>
                 <div id="planned-summary"><p class="label">Planned</p><p id="planned-time" class="value"></p></div>
               </div>
-              <button type="button" class="gold-button" data-action="practice-again">Practice again</button>
+              <div class="completion-buttons">
+                <button type="button" class="gold-button" data-action="practice-again">Practice again</button>
+              </div>
             </div>
-          </div>
+            <div class="setup-rule" aria-hidden="true"></div>
+            <div class="summary-intro">
+              <p class="eyebrow">Your time</p>
+              <h3 id="time-summary-title" class="summary-title">How you spent it.</h3>
+              <p class="summary-note">The time practiced in each step, with each cycle's total and its average per step. Pauses with a step count; the cards and time away don't.</p>
+            </div>
+            <div class="time-table-wrap">
+              <table class="time-table" aria-labelledby="time-summary-title">
+                <thead>
+                  <tr>
+                    <th scope="col" title="The cycle">Cycle</th>
+                    <th scope="col" title="Step 1: बीज रूप — परमधाम में">01</th>
+                    <th scope="col" title="Step 2: विश्व महाराजन — सतयुग में">02</th>
+                    <th scope="col" title="Step 3: पूज्य स्वरूप — द्वापर युग में">03</th>
+                    <th scope="col" title="Step 4: परम पवित्र ब्राह्मण — संगम युग में">04</th>
+                    <th scope="col" title="Step 5: फरिश्ता स्वरूप">05</th>
+                    <th scope="col" title="This cycle's average time per step">Average <br class="title-break">per step</th>
+                    <th scope="col" title="The time practiced in this cycle, in all">Total <br class="title-break">this cycle</th>
+                  </tr>
+                </thead>
+                <tbody id="time-rows"></tbody>
+                <tfoot id="time-all"></tfoot>
+              </table>
+            </div>
+          </section>
         </div>
 
-        <form id="setup" class="setup-panel" novalidate>
-          <div class="setup-intro">
-            <p class="eyebrow">Your practice</p>
-            <h2 class="setup-title">Your quiet moment.</h2>
-            <p class="setup-subtitle">Five forms. One complete cycle.</p>
-          </div>
-          <div class="setup-rule" aria-hidden="true"></div>
-          <div class="setup-fields">
-            <div class="field">
-              <div class="field-row">
-                <div class="field-label">
-                  <label class="field-title" for="cycles-input">Cycles</label>
-                  <p class="field-hint">1–108 rounds</p>
-                </div>
-                <div id="cycles-box" class="input-box stepper">
-                  <button type="button" class="stepper-button" data-step="-1" aria-label="Decrease cycles">
-                    <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6"/></svg>
-                  </button>
-                  <input id="cycles-input" class="number-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="cycles-error">
-                  <button type="button" class="stepper-button" data-step="1" aria-label="Increase cycles">
-                    <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6M5 2v6"/></svg>
-                  </button>
-                </div>
-              </div>
-              <p id="cycles-error" class="field-error" hidden>Enter a whole number from 1 to 108.</p>
+        <!-- The journey: below setup, a scroll away; on completion, in the circle's place (JourneyView) -->
+        <section id="journey" class="journey" aria-labelledby="journey-title">
+          <div class="journey-top">
+            <div class="journey-intro">
+              <p class="eyebrow">Your journey</p>
+              <h2 id="journey-title" class="setup-title" tabindex="-1">Turn by turn.</h2>
+              <p id="journey-subtitle" class="setup-subtitle"></p>
             </div>
-
-            <div class="field">
-              <div class="field-row">
-                <div class="field-label">
-                  <div class="mode-select">
-                    <select id="timing-mode" aria-label="Set time" title="Set the time for each step, a total shared by every step, or no timer (freestyle)">
-                      <option value="perStep">Time per step</option>
-                      <option value="total">Total time</option>
-                      <option value="freestyle">Freestyle</option>
-                    </select>
-                    <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3"/></svg>
-                  </div>
-                  <p id="duration-hint" class="field-hint">For each form</p>
-                </div>
-                <div id="duration-box" class="input-box duration">
-                  <div class="duration-part">
-                    <input id="minutes-input" class="number-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="duration-error">
-                    <span class="unit" aria-hidden="true">min</span>
-                  </div>
-                  <span class="duration-colon" aria-hidden="true">:</span>
-                  <div class="duration-part">
-                    <input id="seconds-input" class="number-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="duration-error">
-                    <span class="unit" aria-hidden="true">sec</span>
-                  </div>
-                </div>
+            <div class="backup">
+              <div class="backup-buttons">
+                <button type="button" class="quiet-button" data-action="import-backup" title="Add the practices in a backup from another device. Nothing here is replaced.">
+                  <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 11.5v1.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1.5"/></svg>Import backup…
+                </button>
+                <button id="export-button" type="button" class="quiet-button" data-action="export-backup" title="Download every practice as a file you can import on another device">
+                  <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2M4.5 5.5 8 2l3.5 3.5M3 11.5v1.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1.5"/></svg>Export backup…
+                </button>
               </div>
-              <p id="duration-error" class="field-error" hidden></p>
-              <label id="countdown-bar-setting" class="checkbox field-option" title="A thin bar along the bottom of each step shows how much of its time is left. Untick to hide it.">
-                <input id="shows-countdown-bar" type="checkbox">
-                <span>Show countdown bar</span>
-              </label>
+              <p id="backup-message" class="backup-message" role="status"></p>
+              <input id="import-file" type="file" accept=".json,application/json" hidden>
             </div>
           </div>
 
-          <div class="summary">
-            <div class="summary-value"><p id="summary-label-1" class="label"></p><p id="summary-value-1" class="value"></p></div>
-            <span class="summary-divider" aria-hidden="true"></span>
-            <div class="summary-value"><p id="summary-label-2" class="label"></p><p id="summary-value-2" class="value"></p></div>
+          <div id="journey-empty" class="journey-card journey-empty" hidden>
+            <svg class="empty-icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="8" width="30" height="27" rx="4"/><path d="M5 15.5h30M13 4.5v7M27 4.5v7"/><circle cx="28.5" cy="28.5" r="5.5"/><path d="M28.5 26v2.7l1.8 1.2"/></svg>
+            <h3 class="empty-title">Your journey begins with your first practice.</h3>
+            <p class="empty-note">Every practice of a minute or more is kept here, in this browser: a calendar of your days, how your practice is growing, and the hours you tend to practice. Practiced on another device or in the Mac app? Import its backup.</p>
           </div>
 
-          <div class="setup-actions">
-            <button id="begin-button" type="submit" class="gold-button begin-button">
-              <svg class="icon icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.6v10.8L13.2 8z"/></svg>
-              <span>Begin meditation</span>
-              <svg class="icon icon-return" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 3v5a2 2 0 0 1-2 2H4M6.5 7.5 4 10l2.5 2.5"/></svg>
-            </button>
-            <p id="setup-note" class="setup-note"></p>
-          </div>
-        </form>
+          <div id="journey-content" class="journey-content">
+            <div class="tiles">
+              <div class="journey-card tile"><p class="label">Today</p><p id="tile-today" class="value"></p><p id="tile-today-detail" class="detail"></p></div>
+              <div class="journey-card tile"><p class="label">Last 7 days</p><p id="tile-week" class="value"></p><p id="tile-week-detail" class="detail"></p></div>
+              <div class="journey-card tile"><p class="label">Last 30 days</p><p id="tile-month" class="value"></p><p id="tile-month-detail" class="detail"></p></div>
+              <div class="journey-card tile"><p class="label">Streak</p><p id="tile-streak" class="value"></p><p id="tile-streak-detail" class="detail"></p></div>
+              <div class="journey-card tile" title="108 cycles make a mala, as 108 beads make a string of prayer beads"><p class="label">Cycles in all</p><p id="tile-cycles" class="value"></p><p id="tile-cycles-detail" class="detail"></p></div>
+            </div>
 
-        <!-- How the practice's time was spent, beside the circle on completion (TimeSummaryPanel) -->
-        <section id="time-summary" class="summary-panel" aria-labelledby="time-summary-title">
-          <div class="setup-intro">
-            <p class="eyebrow">Your time</p>
-            <h2 id="time-summary-title" class="setup-title">How you spent it.</h2>
-            <p class="summary-note">The time practiced in each step, with each cycle's total and its average per step. Pauses with a step count; the cards and time away don't.</p>
-          </div>
-          <div class="setup-rule" aria-hidden="true"></div>
-          <div class="time-table-wrap">
-            <table class="time-table">
-              <thead>
-                <tr>
-                  <th scope="col" title="The cycle">Cycle</th>
-                  <th scope="col" title="Step 1: बीज रूप — परमधाम में">01</th>
-                  <th scope="col" title="Step 2: विश्व महाराजन — सतयुग में">02</th>
-                  <th scope="col" title="Step 3: पूज्य स्वरूप — द्वापर युग में">03</th>
-                  <th scope="col" title="Step 4: परम पवित्र ब्राह्मण — संगम युग में">04</th>
-                  <th scope="col" title="Step 5: फरिश्ता स्वरूप">05</th>
-                  <th scope="col" title="This cycle's average time per step">Average <br class="title-break">per step</th>
-                  <th scope="col" title="The time practiced in this cycle, in all">Total <br class="title-break">this cycle</th>
-                </tr>
-              </thead>
-              <tbody id="time-rows"></tbody>
-              <tfoot id="time-all"></tfoot>
-            </table>
+            <div class="journey-grid">
+              <section class="journey-card calendar-card" aria-labelledby="calendar-month">
+                <div class="calendar-head">
+                  <div>
+                    <p class="eyebrow">Calendar</p>
+                    <h3 id="calendar-month" class="card-title"></h3>
+                  </div>
+                  <div class="month-buttons">
+                    <button id="previous-month" type="button" class="month-button" data-action="previous-month" aria-label="Previous month" title="Previous month">
+                      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>
+                    </button>
+                    <button id="next-month" type="button" class="month-button" data-action="next-month" aria-label="Next month" title="Next month">
+                      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div id="calendar-weekdays" class="calendar-weekdays" aria-hidden="true"></div>
+                <div id="calendar-days" class="calendar-days"></div>
+                <div class="card-rule" aria-hidden="true"></div>
+                <div id="day-detail" class="day-detail" aria-live="polite"></div>
+              </section>
+
+              <section class="journey-card trend-card" aria-labelledby="trend-title">
+                <p class="eyebrow">Trend · last 12 weeks</p>
+                <h3 class="trend-headline">
+                  <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.2"/><path id="trend-arrow" d=""/></svg>
+                  <span id="trend-title"></span>
+                </h3>
+                <p id="trend-detail" class="card-note"></p>
+                <div class="trend-plot">
+                  <div id="trend-chart" class="trend-chart" role="img"><span id="trend-most" class="trend-most" aria-hidden="true"></span></div>
+                  <div class="trend-labels" aria-hidden="true"><span id="trend-first"></span><span id="trend-middle"></span><span>This week</span></div>
+                </div>
+              </section>
+
+              <section class="journey-card rhythm-card" aria-labelledby="rhythm-title">
+                <p id="rhythm-title" class="eyebrow">When you practice · last 12 weeks</p>
+                <div class="rhythm">
+                  <div id="heat-map" class="heat-map" role="img"></div>
+                  <ul id="rhythm-notes" class="rhythm-notes"></ul>
+                </div>
+              </section>
+            </div>
           </div>
         </section>
       </div>

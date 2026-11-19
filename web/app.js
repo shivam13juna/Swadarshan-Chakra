@@ -5,6 +5,10 @@ import {
   STAGES, stageLabel, PER_STEP, TOTAL, FREESTYLE, SessionConfiguration, SessionEngine, TimeText,
   loadPreferences, loadTimedPreferences, savePreferences,
 } from "./engine.js";
+import {
+  CivilDate, PracticeHistory, PracticeInsights, HistoryReadError, HistoryText, practiceTimeAt, todayNumber,
+  recordFromEngine, isWorthKeeping, isCompleted, importSummary, readErrorMessage,
+} from "./history.js";
 
 const MAXIMUM_UNOBSERVED_GAP = 2.5;
 const TICK_MILLISECONDS = 200;
@@ -56,7 +60,81 @@ const model = {
   opensInFullScreen: storage.read("opensInFullScreen") !== "false",
   /// Whether each step shows the countdown bar along its bottom edge. Freestyle has no countdown to show.
   showsCountdownBar: storage.read("showsCountdownBar") !== "false",
+  /// What the last export or import did, shown with the journey's backup buttons.
+  backupMessage: null,
 };
+
+// MARK: History (SessionModel's history, PracticeStore.swift)
+
+/// Every practice kept in this browser, in the backup file's format.
+const HISTORY_KEY = "practiceHistory";
+/// The locale's first day of the week (0 is Sunday); Monday where the browser doesn't say.
+const firstWeekday = (() => {
+  try {
+    const locale = new Intl.Locale(navigator.language || "en");
+    const info = locale.getWeekInfo?.() ?? locale.weekInfo;
+    if (Number.isInteger(info?.firstDay)) return info.firstDay % 7;
+  } catch { /* Monday, then. */ }
+  return 1;
+})();
+
+function readHistory() {
+  const text = storage.read(HISTORY_KEY);
+  if (text == null) return null;
+  try {
+    return PracticeHistory.read(text).history;
+  } catch {
+    // Never write over a history that can't be read: set it aside and begin a new one.
+    storage.write(`${HISTORY_KEY}.unreadable`, text);
+    storage.write(HISTORY_KEY, new PracticeHistory().document());
+    return new PracticeHistory();
+  }
+}
+
+let history = readHistory() ?? new PracticeHistory();
+let insights = new PracticeInsights(history, todayNumber(), firstWeekday);
+const refreshInsights = () => { insights = new PracticeInsights(history, todayNumber(), firstWeekday); };
+
+/// Changes the history as it's stored now, so a practice saved in another tab is never written over.
+/// Where the browser keeps nothing, the history lasts for this visit.
+function storeHistory(change) {
+  const latest = readHistory() ?? history;
+  const result = change(latest);
+  history = latest;
+  storage.write(HISTORY_KEY, history.document());
+  refreshInsights();
+  return result;
+}
+
+/// The practice under way: its own id, and when it began on this device's clock.
+let practice = null;
+/// Its steps, cycles, and pauses when it was last saved.
+let savedState = null;
+
+function startPractice() {
+  const id = window.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  practice = { id, start: practiceTimeAt(new Date()) };
+  savedState = null;
+}
+
+/// Each practice is saved as it goes, at every step, cycle, and pause, so little is lost if the page
+/// goes; and once more as it ends, however it ends. It is kept once it has a minute of practice, or a
+/// whole cycle. `force` saves the time so far even when nothing else has changed.
+function savePractice({ ending = false, force = false } = {}) {
+  if (!practice) return;
+  const current = practice;
+  const finished = ending || engine.phase === "complete";
+  const state = `${engine.transitionCount}/${engine.completedCycles}/${engine.phase === "running" ? 1 : 0}`;
+  if (finished) {
+    practice = null;
+    savedState = null;
+  }
+  if (!isWorthKeeping(engine) || (!finished && !force && state === savedState)) return;
+  const record = recordFromEngine(current.id, current.start, engine, "web");
+  if (!record) return;
+  if (!finished) savedState = state;
+  storeHistory((latest) => latest.upsert(record));
+}
 
 const cycles = () => SessionConfiguration.integer(model.cyclesText, SessionConfiguration.cycleRange);
 const cycleTitle = () => `Cycle ${engine.currentCycle} of ${engine.configuration.cycles}`;
@@ -123,7 +201,9 @@ function begin() {
   savePreferences(chosen, storage.write);
   preloadArtwork();
   if (model.opensInFullScreen) enterFullScreen();
+  model.backupMessage = null;
   engine.begin(chosen, now());
+  startPractice();
   update();
   announce(`Practice started. ${cycleTitle()}`);
 }
@@ -167,20 +247,65 @@ function cancelConfirmation() {
 }
 
 function confirm() {
-  engine.confirm(now());
+  // Restarting and ending both end this practice; what was practiced is kept.
+  if (engine.phase === "confirming") savePractice({ ending: true });
+  if (engine.confirm(now()) === "restart") startPractice();
   update();
 }
 
 function practiceAgain() {
+  savePractice({ ending: true });
   engine.reset();
   update();
 }
 
-/// Esc pauses a running practice and, pressed again, resumes it with the same time left (SessionModel.escape).
+/// Esc pauses a running practice and, pressed again, resumes it with the same time left
+/// (SessionModel.escape). It also cancels a confirmation.
 function escape() {
   if (engine.phase === "running") pause();
   else if (engine.phase === "paused") resume();
   else if (engine.phase === "confirming") cancelConfirmation();
+}
+
+/// The journey, below setup and beside a finished practice's time: scrolls to it (SessionModel.showJourney).
+/// Not during a practice.
+function showJourney() {
+  if (engine.phase !== "ready" && engine.phase !== "complete") return;
+  const behavior = reducedMotion.matches ? "auto" : "smooth";
+  // On completion the journey scrolls on its own, except on a phone, where the page does.
+  if (engine.phase === "complete" && getComputedStyle(journey).overflowY !== "visible") journey.scrollTo({ top: 0, behavior });
+  else journey.scrollIntoView({ block: "start", behavior });
+  journeyTitle.focus({ preventScroll: true });
+}
+
+/// Downloads every practice kept in this browser, to import on another device or in the Mac app.
+function exportHistory() {
+  const name = PracticeHistory.backupName(todayNumber());
+  const url = URL.createObjectURL(new Blob([history.document(practiceTimeAt(new Date()))], { type: "application/json" }));
+  const link = make("a");
+  link.href = url;
+  link.download = name;
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  model.backupMessage = `Downloaded ${HistoryText.count(history.records.length, "practice")} as “${name}”.`;
+  render();
+}
+
+/// Adds the practices in a backup, from this browser, another device, or the Mac app, that aren't here yet.
+async function importHistory(file) {
+  try {
+    const { history: incoming, skipped } = PracticeHistory.read(await file.text());
+    const merge = storeHistory((latest) => latest.merge(incoming.records));
+    model.backupMessage = importSummary(merge, file.name, skipped);
+  } catch (error) {
+    model.backupMessage = readErrorMessage(error instanceof HistoryReadError ? error : new HistoryReadError("unreadable"), file.name);
+  }
+  journeyState.month = null;
+  journeyState.selected = null;
+  render();
 }
 
 // MARK: Timer and screen
@@ -219,6 +344,7 @@ function updateWakeLock() {
 }
 
 function update() {
+  savePractice();
   if (engine.phase === "running") {
     timer ??= window.setInterval(pulse, TICK_MILLISECONDS);
   } else if (timer != null) {
@@ -232,15 +358,17 @@ function update() {
 // MARK: Elements
 
 const app = byId("app");
-const views = { overview: byId("overview"), card: byId("cycle-card"), dial: byId("dial-card"), stage: byId("stage") };
+const views = {
+  overview: byId("overview"), card: byId("cycle-card"), dial: byId("dial-card"), stage: byId("stage"),
+};
 
+const overviewScroll = byId("overview-scroll");
+const journey = byId("journey");
 const orbit = byId("orbit");
 const ring = byId("ring");
 const ringDashed = byId("ring-dashed");
 const orbitChakra = byId("orbit-chakra");
 const orbitFocus = byId("orbit-focus");
-const activeFocus = byId("active-focus");
-const completionFocus = byId("completion-focus");
 const focusEyebrow = byId("focus-eyebrow");
 const focusArt = byId("focus-art");
 const focusTitle = byId("focus-title");
@@ -367,17 +495,16 @@ function layoutOrbit() {
   const width = orbit.clientWidth;
   const height = orbit.clientHeight;
   if (!width || !height) return;
-  const complete = engine.phase === "complete";
   const cardWidth = Math.min(202, Math.max(102, Math.min(width * 0.225, height * 0.275)));
   const cardHeight = cardWidth * 0.565 + 61;
   const radiusX = Math.max(60, (width - cardWidth - 22) / (2 * SIN_72));
   const radiusY = Math.max(60, (height - cardHeight - 16) / (1 + COS_36));
   const centerY = (height + radiusY * (1 - COS_36)) / 2;
   // The lower cards sit to either side of the center; that open space holds a larger focus image.
-  const extraFocusHeight = complete ? 0 : 20;
-  let focusHeight = Math.max(126, radiusY * (1 + COS_36) - cardHeight - 30) + extraFocusHeight;
-  let focusWidth = Math.min(width * 0.44, 420);
-  let focusCenterY = height / 2 + extraFocusHeight / 2;
+  const extraFocusHeight = 20;
+  const focusHeight = Math.max(126, radiusY * (1 + COS_36) - cardHeight - 30) + extraFocusHeight;
+  const focusWidth = Math.min(width * 0.44, 420);
+  const focusCenterY = height / 2 + extraFocusHeight / 2;
 
   orbit.style.setProperty("--card-image-height", `${cardWidth * 0.565}px`);
   const cardRects = cards.map((card, index) => {
@@ -417,11 +544,6 @@ function layoutOrbit() {
     Math.min(card.right, focus.right) - Math.max(card.left, focus.left) > 12
     && Math.min(card.bottom, focus.bottom) - Math.max(card.top, focus.top) > 12);
   orbit.classList.toggle("is-crowded", crowded);
-  if (crowded && complete) {
-    focusWidth = width;
-    focusHeight = height;
-    focusCenterY = height / 2;
-  }
 
   const chakraSize = Math.max(56, Math.min(120, Math.min(radiusX, radiusY) * 0.62));
   orbitChakra.style.setProperty("--chakra-size", `${chakraSize}px`);
@@ -434,7 +556,6 @@ function layoutOrbit() {
   orbitFocus.style.height = `${focusHeight}px`;
   const compact = focusHeight < 240;
   orbitFocus.classList.toggle("is-compact", compact);
-  orbitFocus.classList.toggle("is-short", focusHeight < 280);
   orbitFocus.style.setProperty("--focus-image-height", `${Math.max(65, focusHeight - (compact ? 92 : 113))}px`);
 }
 
@@ -463,7 +584,8 @@ function render() {
 }
 
 function showView(target) {
-  const fade = target !== "overview" && !reducedMotion.matches;
+  const still = (name) => name === "overview";
+  const fade = !still(target) && !reducedMotion.matches;
   const confirming = engine.phase === "confirming";
   for (const [name, view] of Object.entries(views)) {
     view.inert = name !== target || (name === "stage" && confirming);
@@ -471,7 +593,7 @@ function showView(target) {
   if (target === shownView) return;
   for (const [name, view] of Object.entries(views)) {
     // The overview leaves and returns at once; the cards and the pictures cross-fade.
-    view.classList.toggle("is-instant", !fade || name === "overview");
+    view.classList.toggle("is-instant", !fade || still(name));
     view.classList.toggle("is-visible", name === target);
   }
   if (target === "card") turnChakra();
@@ -491,24 +613,32 @@ function setShortcut(key, action) {
   setText(label, action);
 }
 
+/// The overview's phase when last shown: a new one starts at the top of its page.
+let shownPhase = null;
+
 function renderOverview() {
   const ready = engine.phase === "ready";
   setText(statusLabel, ready ? "Ready when you are" : "Practice complete");
-  orbit.classList.toggle("is-preview", ready);
-  orbit.classList.toggle("is-complete", !ready);
-  cards.forEach((card, index) => card.classList.toggle("is-active", ready && index === engine.stageIndex));
-  activeFocus.hidden = !ready;
-  completionFocus.hidden = ready;
+  // A page left open past midnight begins the new day.
+  if (insights.today !== todayNumber()) refreshInsights();
+  if (shownPhase !== engine.phase) {
+    shownPhase = engine.phase;
+    journeyState.month = null;
+    journeyState.selected = null;
+    for (const scroller of [overviewScroll, journey, views.overview]) scroller.scrollTop = 0;
+  }
   if (ready) {
+    cards.forEach((card, index) => card.classList.toggle("is-active", index === engine.stageIndex));
     const stage = engine.currentStage;
     setText(focusEyebrow, `Form ${pad2(stage.id)} / 05`);
     const art = `art/form-${stage.id}-small.jpg`;
     if (focusArt.getAttribute("src") !== art) focusArt.setAttribute("src", art);
     focusArt.alt = stageLabel(stage);
     setText(focusTitle, stage.title);
-    setText(focusContext, stage.context || " ");
+    setText(focusContext, stage.context || " ");
     setShortcut("Space", "Next step during practice");
     renderSetup();
+    renderToday();
   } else {
     const count = engine.completedCycles;
     setText(byId("completed-cycles"), `${count} ${count === 1 ? "cycle" : "cycles"} completed`);
@@ -520,7 +650,280 @@ function renderOverview() {
     setShortcut("Return", "Practice again");
     renderTimeSummary();
   }
+  renderJourney();
   layoutOrbit();
+}
+
+// MARK: Today, in the setup header (MeditationView's todayButton)
+
+const todayButton = byId("today-button");
+const todayPractice = byId("today-practice");
+const todayNone = byId("today-none");
+
+/// Today's practice so far: its time and its cycles. It leads down to the journey.
+function renderToday() {
+  const today = insights.todayTotals;
+  const any = today.practices > 0;
+  todayPractice.hidden = !any;
+  todayNone.hidden = any;
+  if (any) {
+    setText(byId("today-time"), HistoryText.minutes(today.seconds));
+    setText(byId("today-cycles"), HistoryText.count(today.cycles, "cycle"));
+  }
+  todayButton.setAttribute("aria-label", any
+    ? `Today: ${HistoryText.minutes(today.seconds)}, ${HistoryText.count(today.cycles, "cycle")} in ${HistoryText.count(today.practices, "practice")}. Show your journey.`
+    : "Today: no practice yet. Show your journey.");
+}
+
+// MARK: The journey (JourneyView.swift)
+
+const journeyTitle = byId("journey-title");
+const journeySubtitle = byId("journey-subtitle");
+const exportButton = byId("export-button");
+const backupMessage = byId("backup-message");
+const importFile = byId("import-file");
+const journeyEmpty = byId("journey-empty");
+const journeyContent = byId("journey-content");
+const calendarMonth = byId("calendar-month");
+const previousMonth = byId("previous-month");
+const nextMonth = byId("next-month");
+const dayDetail = byId("day-detail");
+const trendArrow = byId("trend-arrow");
+const trendMost = byId("trend-most");
+const rhythmNotes = byId("rhythm-notes");
+const BACKUP_NOTE = "Kept in this browser. A backup carries it to another device or the Mac app.";
+/// The month on the calendar (its first day's number), and the day picked in it; null for today's.
+const journeyState = { month: null, selected: null };
+
+const tiles = Object.fromEntries(["today", "week", "month", "streak", "cycles"].map((name) =>
+  [name, { value: byId(`tile-${name}`), detail: byId(`tile-${name}-detail`) }]));
+
+for (const weekday of insights.weekdayOrder) {
+  byId("calendar-weekdays").append(make("span", "", HistoryText.weekdays[weekday].slice(0, 3)));
+}
+
+/// "↻ 3": a turning arrow and the count of cycles (JourneyView's CycleCount), in blue.
+const CYCLE_ICON = "M13.5 9.5a5.5 5.5 0 1 1-5.5-5.5h2.5M8.6 1.6 11 4l-2.4 2.4";
+function cycleCount(text) {
+  const count = make("span", "cycle-count");
+  const icon = document.createElementNS(SVG, "svg");
+  icon.setAttribute("class", "icon cycle-icon");
+  icon.setAttribute("viewBox", "0 0 16 16");
+  icon.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(SVG, "path");
+  path.setAttribute("d", CYCLE_ICON);
+  icon.append(path);
+  count.append(icon, make("span", "", text));
+  return count;
+}
+
+/// "Saturday, 14 November: 1 hr 50 min, 5 cycles, 3 practices" (Journey.dayLabel)
+function dayLabel(day, totals) {
+  if (totals.practices === 0) return `${HistoryText.dayTitle(day)}: no practice`;
+  return `${HistoryText.dayTitle(day)}: ${HistoryText.minutes(totals.seconds)}, ${HistoryText.count(totals.cycles, "cycle")}, ${HistoryText.count(totals.practices, "practice")}`;
+}
+
+/// Always six weeks, so the card keeps its height from month to month. A day: its number; then its
+/// cycles, bottom left, in blue, and its time, bottom right.
+const calendarCells = Array.from({ length: 42 }, () => {
+  const cell = make("button", "day");
+  cell.type = "button";
+  cell.dataset.action = "select-day";
+  const number = make("span", "day-number");
+  const cycles = cycleCount("");
+  cycles.classList.add("day-cycles");
+  const time = make("span", "day-time");
+  for (const part of [number, cycles, time]) part.setAttribute("aria-hidden", "true");
+  cell.append(number, cycles, time);
+  byId("calendar-days").append(cell);
+  return { cell, number, cycles, cyclesText: cycles.lastElementChild, time };
+});
+
+const trendChart = byId("trend-chart");
+const trendBars = Array.from({ length: PracticeInsights.weeksShown }, () => {
+  const bar = make("div", "trend-bar");
+  trendChart.append(bar);
+  return bar;
+});
+
+const heatMap = byId("heat-map");
+const heatCells = insights.weekdayOrder.map((weekday) => {
+  heatMap.append(make("span", "heat-label", HistoryText.weekdays[weekday].slice(0, 3)));
+  return Array.from({ length: 24 }, (_, hour) => {
+    const cell = make("span", "heat-cell");
+    heatMap.append(cell);
+    return { cell, weekday, hour };
+  });
+}).flat();
+heatMap.append(make("span"));
+for (let mark = 0; mark < 24; mark += 3) heatMap.append(make("span", "heat-mark", HistoryText.hourMark(mark)));
+
+/// The arrow inside the trend's circle (JourneyView's trend symbols).
+const TREND_ARROWS = {
+  rising: "M7 13 13 7M8.5 7H13v4.5",
+  steady: "M5.5 10h9M11 6.5l3.5 3.5-3.5 3.5",
+  easing: "M7 7l6 6M13 8.5V13H8.5",
+  beginning: "M10 5.5v9M5.5 10h9",
+  resting: "M12.5 6.5a4 4 0 1 0 1.5 6 3.2 3.2 0 0 1-1.5-6z",
+};
+const DIRECTION_ICONS = { up: "M4 12 12 4M5.5 4H12v6.5", down: "M4 4l8 8M12 5.5V12H5.5", same: "M3.5 6h9M3.5 10h9" };
+
+function setTile(name, value, detail, direction = null) {
+  setText(tiles[name].value, value);
+  const box = tiles[name].detail;
+  box.replaceChildren();
+  if (direction && DIRECTION_ICONS[direction]) {
+    const icon = document.createElementNS(SVG, "svg");
+    icon.setAttribute("class", "icon");
+    icon.setAttribute("viewBox", "0 0 16 16");
+    icon.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(SVG, "path");
+    path.setAttribute("d", DIRECTION_ICONS[direction]);
+    icon.append(path);
+    box.append(icon);
+  }
+  box.append(make("span", "", detail));
+  box.classList.toggle("is-up", direction === "up");
+}
+
+/// "6:42 am · 15 min · 3 cycles · Mac" (Journey.line)
+function practiceLine(record) {
+  const parts = [HistoryText.time(record.time.hour, record.time.minute), HistoryText.minutes(record.seconds),
+    isCompleted(record) ? HistoryText.count(record.cycles, "cycle") : `${record.cycles} of ${record.planned} cycles`];
+  if (record.timing === FREESTYLE) parts.push("freestyle");
+  if (record.device) parts.push(record.device === "web" ? "Web" : record.device === "mac" ? "Mac" : record.device);
+  return parts.join(" · ");
+}
+
+function renderJourney() {
+  const empty = history.isEmpty;
+  setText(journeySubtitle, empty ? "Nothing kept yet." : `${HistoryText.count(insights.all.practices, "practice")} since ${HistoryText.date(insights.firstDay)} · ${HistoryText.minutes(insights.all.seconds)} in all`);
+  exportButton.disabled = empty;
+  setText(backupMessage, model.backupMessage ?? BACKUP_NOTE);
+  backupMessage.classList.toggle("is-result", model.backupMessage != null);
+  journeyEmpty.hidden = !empty;
+  journeyContent.hidden = empty;
+  if (empty) return;
+
+  setTile("today", HistoryText.minutes(insights.todayTotals.seconds), insights.todayDetail);
+  setTile("week", HistoryText.minutes(insights.last7), insights.weekComparison.text, insights.weekComparison.direction);
+  setTile("month", HistoryText.minutes(insights.last30), insights.monthComparison.text, insights.monthComparison.direction);
+  setTile("streak", insights.streakValue, insights.streakDetail);
+  setTile("cycles", String(insights.all.cycles), insights.cyclesDetail);
+  renderCalendar();
+  renderTrend();
+  renderRhythm();
+}
+
+function renderCalendar() {
+  const today = insights.today;
+  const current = CivilDate.fromDayNumber(today);
+  const first = journeyState.month ?? CivilDate.dayNumber(current.year, current.month, 1);
+  const shown = CivilDate.fromDayNumber(first);
+  const length = CivilDate.daysInMonth(shown.month, shown.year);
+  const leading = (CivilDate.weekday(first) - insights.firstWeekday + 7) % 7;
+  const earliest = CivilDate.fromDayNumber(insights.firstDay ?? today);
+  const selected = journeyState.selected ?? today;
+  setText(calendarMonth, `${HistoryText.months[shown.month - 1]} ${shown.year}`);
+  previousMonth.disabled = shown.year * 12 + shown.month <= earliest.year * 12 + earliest.month;
+  nextMonth.disabled = shown.year * 12 + shown.month >= current.year * 12 + current.month;
+  calendarCells.forEach(({ cell, number, cycles, cyclesText, time }, index) => {
+    const offset = index - leading;
+    const inMonth = offset >= 0 && offset < length;
+    cell.classList.toggle("is-blank", !inMonth);
+    cell.tabIndex = inMonth ? 0 : -1;
+    cell.setAttribute("aria-hidden", String(!inMonth));
+    if (!inMonth) return;
+    const day = first + offset;
+    const totals = insights.totals(day);
+    cell.dataset.day = String(day);
+    cell.dataset.level = String(insights.level(day));
+    cell.disabled = day > today;
+    cell.classList.toggle("is-today", day === today);
+    cell.classList.toggle("is-selected", day === selected);
+    cell.setAttribute("aria-pressed", String(day === selected));
+    setText(number, String(offset + 1));
+    cycles.hidden = totals.practices === 0;
+    setText(cyclesText, String(totals.cycles));
+    setText(time, HistoryText.compact(totals.seconds));
+    cell.setAttribute("aria-label", dayLabel(day, totals));
+    cell.title = totals.practices === 0 ? "" : dayLabel(day, totals);
+  });
+
+  // The day picked: its time in gold, its cycles in blue, and how many practices.
+  const totals = insights.totals(selected);
+  const records = history.recordsOn(selected);
+  const head = make("p", "day-detail-head");
+  head.append(make("span", "day-detail-title", HistoryText.dayTitle(selected)));
+  if (totals.practices > 0) {
+    const sums = make("span", "day-detail-totals");
+    sums.append(make("span", "day-detail-time", HistoryText.minutes(totals.seconds)), make("span", "", "·"),
+      cycleCount(HistoryText.count(totals.cycles, "cycle")), make("span", "", "·"),
+      make("span", "", HistoryText.count(totals.practices, "practice")));
+    head.append(sums);
+  }
+  const lines = records.length === 0
+    ? [make("p", "", selected === today ? "No practice yet today." : "No practice on this day.")]
+    : records.slice(0, 3).map((record) => make("p", "", practiceLine(record)));
+  if (records.length > 3) lines.push(make("p", "", `and ${records.length - 3} more`));
+  dayDetail.replaceChildren(head, ...lines);
+}
+
+/// Another month: today stays picked in this one; in another, its last day with practice, or its first.
+function stepMonth(months) {
+  const current = CivilDate.fromDayNumber(journeyState.month ?? insights.today);
+  const index = current.year * 12 + current.month - 1 + months;
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+  const first = CivilDate.dayNumber(year, month, 1);
+  const today = CivilDate.fromDayNumber(insights.today);
+  journeyState.month = first;
+  if (year === today.year && month === today.month) {
+    journeyState.selected = null;
+  } else {
+    let picked = first;
+    for (let day = first; day < first + CivilDate.daysInMonth(month, year); day += 1) {
+      if (insights.totals(day).practices > 0) picked = day;
+    }
+    journeyState.selected = picked;
+  }
+  renderJourney();
+}
+
+function renderTrend() {
+  setText(byId("trend-title"), insights.trendTitle);
+  setText(byId("trend-detail"), insights.trendDetail);
+  trendArrow.setAttribute("d", TREND_ARROWS[insights.trend]);
+  sizeTrendBars();
+  trendBars.forEach((bar, index) => {
+    const seconds = insights.weekTotals[index];
+    bar.classList.toggle("is-empty", seconds === 0);
+    bar.classList.toggle("is-current", index === trendBars.length - 1);
+    bar.title = `Week of ${HistoryText.shortDate(insights.weekStarts[index])}: ${HistoryText.minutes(seconds)}`;
+  });
+  const most = Math.max(1, ...insights.weekTotals);
+  setText(trendMost, HistoryText.compact(most > 1 ? most : 0));
+  setText(byId("trend-first"), HistoryText.shortDate(insights.weekStarts[0]));
+  setText(byId("trend-middle"), HistoryText.shortDate(insights.weekStarts[6]));
+  trendChart.setAttribute("aria-label", `Weekly practice, oldest first: ${insights.weekTotals.map((seconds, index) =>
+    `week of ${HistoryText.shortDate(insights.weekStarts[index])}, ${HistoryText.minutes(seconds)}`).join("; ")}`);
+}
+
+/// The bars, in the chart's height: it grows when the card beside it is taller.
+function sizeTrendBars() {
+  const most = Math.max(1, ...insights.weekTotals);
+  const tall = trendChart.clientHeight || 88;
+  trendBars.forEach((bar, index) => {
+    const seconds = insights.weekTotals[index];
+    bar.style.height = `${seconds === 0 ? 2 : Math.max(4, (tall * seconds) / most)}px`;
+  });
+}
+
+function renderRhythm() {
+  for (const { cell, weekday, hour } of heatCells) cell.dataset.level = String(insights.heatLevel(weekday, hour));
+  const notes = insights.rhythmNotes;
+  rhythmNotes.replaceChildren(...notes.map((note) => make("li", "", note)));
+  heatMap.setAttribute("aria-label", `The hours of the week you practice, over the last twelve weeks. ${notes.join(" ")}`);
 }
 
 // MARK: Your time (TimeSummaryPanel.swift)
@@ -634,11 +1037,11 @@ function renderCard() {
 
 /// Where the hand points for each step, in degrees clockwise from twelve o'clock: the top, where the
 /// Confluence Age meets Sat Yuga (step 1); the middle of Sat Yuga's quarter (2); the middle of Dwapar
-/// Yuga's (3); the middle of the Confluence Age's wedge, 336° to 360° in the picture (4); and the top
-/// again (5), where the next cycle begins.
-const DIAL_ANGLES = [0, 45, 225, 348, 360];
+/// Yuga's (3); the middle of the Confluence Age's wedge, 336° to 360° in the picture (4); and near
+/// that wedge's end (5), 4° short of the top: the age is ending, but not yet over.
+const DIAL_ANGLES = [0, 45, 225, 348, 356];
 const DIAL_PLACES = ["the top, where the Confluence Age meets Sat Yuga", "Sat Yuga", "Dwapar Yuga",
-  "the Confluence Age", "the top, where the Confluence Age meets Sat Yuga"];
+  "the Confluence Age", "the end of the Confluence Age, just short of Sat Yuga"];
 const dialCycleCounter = byId("dial-cycle-counter");
 const yugaDial = byId("yuga-dial");
 const dialHand = byId("yuga-dial-hand");
@@ -875,8 +1278,31 @@ document.addEventListener("click", (event) => {
     case "confirm": confirm(); break;
     case "practice-again": practiceAgain(); break;
     case "fullscreen": isFullScreen() ? exitFullScreen() : enterFullScreen(); break;
+    case "journey": showJourney(); break;
+    case "export-backup": exportHistory(); break;
+    case "import-backup": importFile.click(); break;
+    case "previous-month": stepMonth(-1); break;
+    case "next-month": stepMonth(1); break;
+    case "select-day":
+      journeyState.selected = Number(button.dataset.day);
+      renderJourney();
+      break;
     default: break;
   }
+});
+
+importFile.addEventListener("change", () => {
+  const [file] = importFile.files ?? [];
+  importFile.value = "";
+  if (file) importHistory(file);
+});
+
+// A practice kept in another tab shows here too.
+window.addEventListener("storage", (event) => {
+  if (event.key !== HISTORY_KEY && event.key !== null) return;
+  history = readHistory() ?? new PracticeHistory();
+  refreshInsights();
+  if (engine.phase === "ready" || engine.phase === "complete") render();
 });
 
 const isTextField = (element) => element instanceof HTMLInputElement && element.type === "text";
@@ -940,6 +1366,9 @@ document.addEventListener("keydown", (event) => {
   if (key === "f" && fullScreenSupported) {
     event.preventDefault();
     if (isFullScreen()) exitFullScreen(); else enterFullScreen();
+  } else if (key === "j" && (engine.phase === "ready" || engine.phase === "complete")) {
+    event.preventDefault();
+    showJourney();
   } else if (key === "r" && engine.phase === "paused") {
     event.preventDefault();
     request("restart");
@@ -980,7 +1409,11 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-window.addEventListener("pagehide", () => setPresent(false));
+// Leaving the page pauses the practice, and keeps what was practiced.
+window.addEventListener("pagehide", () => {
+  setPresent(false);
+  savePractice({ force: true });
+});
 window.addEventListener("pageshow", () => { if (inFront()) setPresent(true); });
 
 // Leaving or reloading the page mid-practice asks first, as quitting the app does.
@@ -1001,6 +1434,7 @@ byId("confirm-hint").textContent = `Esc to keep practicing · ${isMac ? "⌘Retu
 syncInputs();
 render();
 new ResizeObserver(() => layoutOrbit()).observe(orbit);
+new ResizeObserver(() => sizeTrendBars()).observe(trendChart);
 
 // Fetch the full pictures once the page is idle, unless the visitor has asked to save data.
 if (!navigator.connection?.saveData) {

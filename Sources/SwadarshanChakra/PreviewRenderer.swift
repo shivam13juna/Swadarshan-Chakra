@@ -26,8 +26,14 @@ enum PreviewRenderer {
                     ("no-countdown-bar", 1440, 900), ("between-steps", 1440, 900), ("turning-hand", 1440, 900),
                     ("wide-between-steps", 2560, 1080), ("compact-between-steps", 1024, 640),
                     ("portrait-between-steps", 900, 1440), ("first-step-card", 1440, 900),
-                    ("summary", 1440, 900), ("compact-summary", 1024, 640)
+                    ("summary", 1440, 900), ("compact-summary", 1024, 640),
+                    ("medium-summary", 1280, 800), ("wide-summary", 2560, 1440),
+                    ("journey", 1440, 900), ("compact-journey", 1024, 640), ("wide-journey", 2560, 1440),
+                    ("journey-empty", 1440, 900), ("ready-empty", 1440, 900)
                 ]
+                // The sample the captures show, as the app would export it: the web version imports it too.
+                try sampleHistory.document(exported: PracticeTime(sampleNow))
+                    .write(to: output.appendingPathComponent("sample-backup.json"))
                 for (name, width, height) in scenarios {
                     let model = makeModel(name)
                     let root = MeditationView(model: model, artwork: artwork)
@@ -93,10 +99,62 @@ enum PreviewRenderer {
     private static let turns = ["between-steps": 1, "turning-hand": 2, "wide-between-steps": 2,
                                 "compact-between-steps": 3, "portrait-between-steps": 4]
 
+    /// Midday on Wednesday, 18 November 2026, in UTC: the same day in nearly every time zone.
+    private static let sampleNow = Date(timeIntervalSince1970: Double(20775 * 86400 + 12 * 3600))
+
+    /// Fourteen weeks of a morning practice that grows more regular, longer practices at weekends, and
+    /// some evenings; the afternoons stay free. The same every time.
+    static let sampleHistory: PracticeHistory = {
+        let today = 20775
+        var seed: UInt64 = 108
+        func random(_ range: Int) -> Int {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Int((seed >> 33) % UInt64(range))
+        }
+        var records: [PracticeRecord] = []
+        func add(_ day: Int, hour: Int, cycles: Int, perStep: Int, device: String) {
+            let date = CivilDate(dayNumber: day)
+            let start = String(format: "%04d-%02d-%02dT%02d:%02d:%02d+05:30", date.year, date.month, date.day,
+                               hour, random(60), random(60))
+            records.append(PracticeRecord(id: "sample-\(records.count + 1)", start: PracticeTime(start)!,
+                                          seconds: cycles * 5 * perStep, cycles: cycles, planned: cycles, timing: .perStep,
+                                          steps: Array(repeating: cycles * perStep, count: 5), device: device)!)
+        }
+        for offset in stride(from: 97, through: 0, by: -1) {
+            let day = today - offset
+            let weekday = CivilDate.weekday(day)
+            if offset < 12 || random(100) < 40 + (97 - offset) * 55 / 97 {
+                add(day, hour: 4 + random(3), cycles: 2 + random(3), perStep: 60 * (2 + random(2)),
+                    device: random(3) == 0 ? "web" : "mac")
+            }
+            if (weekday == 0 || weekday == 6) && random(100) < 55 {
+                add(day, hour: 8 + random(2), cycles: 4 + random(5), perStep: 120, device: "mac")
+            }
+            if offset > 0 && random(100) < 18 {
+                add(day, hour: 20 + random(2), cycles: 1 + random(2), perStep: 60, device: "web")
+            }
+        }
+        return PracticeHistory(records)
+    }()
+
+    /// The journey captures show setup scrolled down to it.
     private static func makeModel(_ name: String) -> SessionModel {
+        let model = makeSessionModel(name)
+        if name.contains("journey") { model.showJourney() }
+        return model
+    }
+
+    private static func makeSessionModel(_ name: String) -> SessionModel {
         let setupScreens = ["ready", "compact-ready", "invalid", "long-duration", "zero-duration",
-                            "total-time", "compact-total-time", "total-time-too-short", "freestyle", "compact-freestyle"]
+                            "total-time", "compact-total-time", "total-time-too-short", "freestyle", "compact-freestyle",
+                            "journey", "compact-journey", "wide-journey", "journey-empty", "ready-empty"]
         let defaults = UserDefaults(suiteName: "com.swadarshan.chakra.previews")!
+        // Every capture shows the same history, on the same day, with weeks that begin on Monday.
+        let history = name.hasSuffix("-empty") ? PracticeHistory() : sampleHistory
+        func SessionModel(defaults: UserDefaults, automaticTicks: Bool, initialEngine: SessionEngine) -> SwadarshanChakra.SessionModel {
+            .init(defaults: defaults, automaticTicks: automaticTicks, initialEngine: initialEngine,
+                  store: .memory(history), clock: { sampleNow }, firstWeekday: 1)
+        }
         if let stage = turns[name] {
             var engine = SessionEngine()
             engine.begin(try! SessionConfiguration(cycles: 3, minutesPerStep: 1), at: 0)
@@ -112,7 +170,7 @@ enum PreviewRenderer {
         }
         if name.hasSuffix("summary") {
             return SessionModel(defaults: defaults, automaticTicks: false,
-                                initialEngine: finishedPractice(cycles: name == "summary" ? 3 : 30))
+                                initialEngine: finishedPractice(cycles: name == "compact-summary" ? 30 : 3))
         }
         if name.hasPrefix("freestyle-") {
             // Freestyle steps, without the card that opens each cycle: no countdown, and no bar.

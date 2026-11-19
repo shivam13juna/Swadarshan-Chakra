@@ -48,6 +48,7 @@ enum Check {
 enum CoreCheckRunner {
     static func main() {
         let suite = SessionEngineTests()
+        let history = PracticeHistoryTests()
         let cases: [(String, () throws -> Void)] = [
             ("Per-step durations and automatic totals", suite.testPerStepDurationsAndAutomaticTotals),
             ("Input validation", suite.testValidationRejectsOutOfRangeAndNonWholeInputs),
@@ -92,7 +93,18 @@ enum CoreCheckRunner {
             ("Total time preferences", suite.testTotalTimePreferencesRoundTripAndFallBack),
             ("Freestyle has no timer", suite.testFreestyleHasNoTimer),
             ("Freestyle steps", suite.testFreestyleStepsLastUntilThePractitionerMovesOn),
-            ("Freestyle preferences", suite.testFreestylePreferencesKeepTheTimeLastEntered)
+            ("Freestyle preferences", suite.testFreestylePreferencesKeepTheTimeLastEntered),
+            ("History: calendar days", history.testCalendarDays),
+            ("History: practice times", history.testPracticeTimes),
+            ("History: reading the shared backup", history.testReadingTheSharedBackup),
+            ("History: insights from the shared backup", history.testInsightsFromTheSharedBackup),
+            ("History: an empty history", history.testAnEmptyHistory),
+            ("History: trends and streaks", history.testTrendsAndStreaks),
+            ("History: merging another device's practices", history.testMergingAnotherDevicesPractices),
+            ("History: writing and reading a backup", history.testWritingAndReadingABackup),
+            ("History: files that aren't backups", history.testFilesThatArentBackups),
+            ("History: practices from the engine", history.testPracticesFromTheEngine),
+            ("History: words and numbers", history.testWordsAndNumbers)
         ]
         for (name, test) in cases {
             let previous = Check.failures

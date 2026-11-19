@@ -20,11 +20,11 @@
 
 ## What it does
 
-Swadarshan Chakra guides you through five consecutive forms of spiritual self-awareness, one at a time. Each form's picture fills your screen while you contemplate it. When its time is up, the hand on the cycle of ages turns to where the next form stands, and the next form begins. After the fifth, the circle starts again. One pass through all five forms is a **cycle**. At the end, you can see how you spent your time, step by step and cycle by cycle.
+Swadarshan Chakra guides you through five consecutive forms of spiritual self-awareness, one at a time. Each form's picture fills your screen while you contemplate it. When its time is up, the hand on the cycle of ages turns to where the next form stands, and the next form begins. After the fifth, the circle starts again. One pass through all five forms is a **cycle**. At the end, you can see how you spent your time, step by step and cycle by cycle. Every practice is kept, and **your journey**, below the setup screen and beside every finished practice, shows how your practice is growing: a calendar of your days and their cycles, your trend, and the hours you tend to practice.
 
 You choose how many cycles to practice and how much time to give them. The app keeps time, so you don't have to. Or practice freestyle, with no timer at all.
 
-No Mac, or nothing to install? The same practice runs in any modern browser at **[swadarshan-chakra.web.app](https://swadarshan-chakra.web.app)**, on a computer or a phone. Your settings stay in that browser.
+No Mac, or nothing to install? The same practice runs in any modern browser at **[swadarshan-chakra.web.app](https://swadarshan-chakra.web.app)**, on a computer or a phone. Your settings and your practice history stay in that browser, and a backup file carries your history between the browser and the Mac app.
 
 ### The five steps
 
@@ -91,6 +91,8 @@ With a timer, **Show countdown bar** puts a thin bar along the bottom of each st
 
 Clicking a field selects its whole value, so you can type the new one straight away. The panel shows what your choice works out to. Press **Begin meditation** (or <kbd>Return</kbd>). Your settings are remembered for next time.
 
+**Today**, at the top of the screen, shows how long you've practiced today and how many cycles. Click it, or scroll down, for [your journey](#your-journey).
+
 <br clear="right">
 
 ### 2. Meditate
@@ -116,7 +118,7 @@ Every step opens with a short card showing the cycle of ages, with a white hand 
 - Before step 2, **विश्व महाराजन**: from the top to Sat Yuga.
 - Before step 3, **पूज्य स्वरूप**: on to Dwapar Yuga.
 - Before step 4, **परम पवित्र ब्राह्मण**: on to the Confluence Age.
-- Before step 5, **फरिश्ता स्वरूप**: back to the top, where the next cycle starts.
+- Before step 5, **फरिश्ता स्वरूप**: a little further, near the end of the Confluence Age but short of the top. The age is ending, but it isn't over yet.
 
 After three seconds the step begins on its own. Press <kbd>Space</kbd> to begin it right away. The card isn't counted as practice time, and every step still gets its full time.
 
@@ -128,13 +130,30 @@ Each cycle opens with a short card: *Cycle 1*, *Cycle 2*, and so on. After three
 
 ### 5. Finish
 
-![The completion screen: the time practiced and planned, and beside it a table of each cycle's time in each step, its total, and its average per step](docs/screenshots/complete.jpg)
+![The completion screen: your journey on the left, with this practice in it; on the right, the time practiced and planned, and a table of each cycle's time in each step, its total, and its average per step](docs/screenshots/complete.jpg)
 
-When the last cycle ends, you'll see how many cycles you completed and how long you actually practiced. That includes the time you spent paused with a step in front of you. Time away doesn't count: in another app, or with your Mac asleep or locked.
+When the last cycle ends, the panel on the right shows how many cycles you completed and how long you actually practiced. That includes the time you spent paused with a step in front of you. Time away doesn't count: in another app, or with your Mac asleep or locked.
 
-Beside it, **Your time** shows how you spent it. Each cycle has a row with the time you gave each of the five steps, then **Average per step** and **Total this cycle**. With more than one cycle, a last row adds them all up. A long practice scrolls; the column titles and that last row stay in view.
+Below that, **Your time** shows how you spent it. Each cycle has a row with the time you gave each of the five steps, then **Average per step** and **Total this cycle**. With more than one cycle, a last row adds them all up. A long practice scrolls; the column titles and that last row stay in view.
+
+On the left, in place of the circle, is [your journey](#your-journey), with this practice already in it. It scrolls on its own, so the panel stays in view.
 
 Press <kbd>Return</kbd> to practice again.
+
+## Your journey
+
+![Your journey, below the setup screen: totals for today, the last 7 and 30 days, your streak, and your cycles; a calendar of November with each day's cycles and time; twelve weeks rising; and the hours of the week you practice](docs/screenshots/journey.jpg)
+
+Every practice is kept once it has a minute of practice or a whole cycle, however it ends: finished, ended from the pause screen, or with the window closed. Your journey is below the setup screen: scroll down, click **Today** at the top or **Your journey** at the foot of the circle, or press <kbd>⌘</kbd> <kbd>J</kbd> (<kbd>J</kbd> on the web). When a practice ends, it is beside your time.
+
+- **Totals:** today, the last 7 and 30 days (each against the 7 or 30 days before), your streak of days in a row, and all your cycles. 108 cycles make a mala.
+- **Calendar:** each day shaded by how long you practiced, with its cycles in blue at the bottom left and its time at the bottom right. Click a day to see its practices: when each began, how long it lasted, and its cycles.
+- **Trend:** your last twelve weeks, and whether your practice is rising, steady, or easing off, from the last four weeks against the four before.
+- **When you practice:** the hours of the week you tend to practice, over the last twelve weeks. Notes beside it name your quietest part of the day, a good time for another cycle, and count the mornings you practiced at amrit vela, between 3 and 5 am.
+
+### Moving your history to another device
+
+**Export backup…** saves every practice to a file, such as `Swadarshan Chakra backup 2026-11-18.json`. On another Mac, or in the web version, **Import backup…** adds the practices it doesn't have yet. Nothing is replaced, and importing the same file twice changes nothing, so you can carry your history back and forth: Mac to Mac, browser to browser, or between the Mac app and a browser, either way. In the Mac app, both are in the **File** menu too.
 
 ## Full screen or a window
 
@@ -149,6 +168,8 @@ You can also switch at any time, as in any Mac app: click the green window butto
 | <kbd>Return</kbd> | Begin · Resume · Practice again |
 | <kbd>Space</kbd> | Next step, or start a step right away from its card |
 | <kbd>Esc</kbd> | Pause · Resume |
+| <kbd>⌘</kbd> <kbd>J</kbd> | Down to your journey |
+| <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>E</kbd> / <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>I</kbd> | Export / Import a backup |
 | <kbd>⌘</kbd> <kbd>R</kbd> / <kbd>⌘</kbd> <kbd>E</kbd> | Restart / End, while paused (asks first) |
 | <kbd>⌘</kbd> <kbd>Return</kbd> | Confirm restart, end, or quit |
 | <kbd>⌃</kbd> <kbd>⌘</kbd> <kbd>F</kbd> | Enter or leave full screen |
@@ -160,7 +181,7 @@ Holding <kbd>Space</kbd> down never skips more than one step.
 
 ## Privacy
 
-Everything happens on your Mac. There are no accounts, no tracking, and no internet connection: the app never goes online. Your settings are stored only on this Mac.
+Everything happens on your Mac. There are no accounts, no tracking, and no internet connection: the app never goes online. Your settings and your practice history are stored only on this Mac, the history in `~/Library/Application Support/Swadarshan Chakra`. A backup goes only where you save it. The web version keeps them in your browser in the same way.
 
 ## For developers
 
@@ -187,10 +208,12 @@ APP="dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra"
 "$APP" --verify-resources            # the packaged app decodes all five pictures
 "$APP" --verify-timer                # live cycle card, step cards, 12-second step, and step bar; about 23 s, off screen
 "$APP" --smoke-test                  # drives the real full-screen window; about 45 s, takes over the screen
-"$APP" --render-previews <folder>    # renders every screen to PNG, as used for the screenshots here
+"$APP" --render-previews <folder>    # renders every screen to PNG, as used for the screenshots here, and a sample backup
+"$APP" --verify-backup <file>        # reads a backup as Import Backup does, and says what it holds; nothing is saved
+"$APP" --verify-history              # practices through the app's own model, kept in a temporary file; off screen, about a second
 ```
 
-**Web version.** `web/` is the same practice for the browser, with no build step. `engine.js` is a port of `MeditationCore`; `Tests/web/engine-checks.mjs` mirrors the core checks, and `check.sh` runs it when Node is installed. `app.js` and `app.css` follow the SwiftUI screens. Preview it locally with `firebase serve --only hosting`.
+**Web version.** `web/` is the same practice for the browser, with no build step. `engine.js` is a port of `MeditationCore`; `Tests/web/engine-checks.mjs` mirrors the core checks, and `check.sh` runs it when Node is installed. `history.js` ports the practice history. `Tests/web/history-checks.mjs` and the core checks read one shared fixture, `Tests/fixtures/history-v1.json`, and expect the same numbers and words, so each version reads the other's backups. `app.js` and `app.css` follow the SwiftUI screens. Preview it locally with `firebase serve --only hosting`.
 
 **Publishing.** Pushing to `main` publishes both:
 

@@ -8,6 +8,10 @@ enum Palette {
     static let muted = Color(red: 0.66, green: 0.68, blue: 0.73)
     static let faint = Color(red: 0.43, green: 0.47, blue: 0.55)
     static let error = Color(red: 1, green: 0.69, blue: 0.57)
+    /// Cycles, wherever the journey counts them: a sky blue against the gold of time, and a deep
+    /// blue on a day of full gold.
+    static let cycles = Color(red: 0.58, green: 0.77, blue: 1)
+    static let cyclesOnGold = Color(red: 0.11, green: 0.24, blue: 0.48)
 
     static func hindi(_ size: CGFloat) -> Font {
         // macOS supplies the font and its Devanagari shaping; no third-party font is bundled.

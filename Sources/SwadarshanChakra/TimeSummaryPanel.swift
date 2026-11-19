@@ -1,29 +1,33 @@
 import SwiftUI
 import MeditationCore
 
-/// How the practice's time was spent, beside the completion screen's circle: for each cycle, the time
-/// practiced in each of its five steps, the average per step, and the cycle's total, then all cycles
-/// together. Practiced time includes pauses spent with a step; the cards and time away never count.
+/// The finished practice, beside the journey on the completion screen: that it's complete, its time
+/// against the plan, and the way on; then how its time was spent: for each cycle, the time practiced in
+/// each of its five steps, the average per step, and the cycle's total, then all cycles together.
+/// Practiced time includes pauses spent with a step; the cards and time away never count.
 struct TimeSummaryPanel: View {
-    let engine: SessionEngine
+    @ObservedObject var model: SessionModel
     let compact: Bool
 
     private var rowHeight: CGFloat { compact ? 24 : 27 }
 
     var body: some View {
+        let engine = model.engine
         let cycles = engine.stepSeconds
         VStack(alignment: .leading, spacing: compact ? 12 : 18) {
-            VStack(alignment: .leading, spacing: compact ? 8 : 10) {
+            completion(engine)
+
+            Rectangle().fill(Palette.gold.opacity(0.17)).frame(height: 1)
+
+            VStack(alignment: .leading, spacing: compact ? 6 : 8) {
                 Eyebrow(text: "YOUR TIME")
                 Text("How you spent it.")
-                    .font(.system(size: compact ? 26 : 32, weight: .regular, design: .serif))
+                    .font(.system(size: compact ? 21 : 25, weight: .regular, design: .serif))
                     .foregroundColor(Palette.ivory).fixedSize(horizontal: false, vertical: true)
                 Text("The time practiced in each step, with each cycle's total and its average per step. Pauses with a step count; the cards and time away don't.")
                     .font(.system(size: compact ? 11 : 12)).foregroundColor(Palette.muted)
                     .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             }
-
-            Rectangle().fill(Palette.gold.opacity(0.17)).frame(height: 1)
 
             VStack(spacing: 0) {
                 header
@@ -52,8 +56,49 @@ struct TimeSummaryPanel: View {
                 .overlay(RoundedRectangle(cornerRadius: 17).stroke(Palette.gold.opacity(0.17), lineWidth: 0.7))
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Your time")
+        .accessibilityLabel("Your practice")
         .accessibilityIdentifier("time-summary")
+    }
+
+    /// Complete: the cycles done, the time practiced against the time planned, and the way on.
+    /// Practiced includes time paused with a step; freestyle planned no time to compare it with.
+    private func completion(_ engine: SessionEngine) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 14 : 18) {
+            HStack(alignment: .center, spacing: compact ? 12 : 14) {
+                Image(systemName: "checkmark.seal")
+                    .font(.system(size: compact ? 28 : 34, weight: .ultraLight)).foregroundColor(Palette.gold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Meditation complete")
+                        .font(.system(size: compact ? 25 : 30, weight: .regular, design: .serif))
+                        .foregroundColor(Palette.ivory).lineLimit(1).minimumScaleFactor(0.8)
+                    Text("\(engine.completedCycles) \(engine.completedCycles == 1 ? "cycle" : "cycles") completed")
+                        .font(.system(size: 13)).foregroundColor(Palette.muted)
+                }
+            }
+            HStack(spacing: 22) {
+                completionTime("PRACTICED", TimeText.elapsed(engine.activeSeconds))
+                if engine.configuration.isTimed {
+                    Rectangle().fill(Palette.gold.opacity(0.25)).frame(width: 1, height: 32)
+                    completionTime("PLANNED", TimeText.elapsed(engine.configuration.plannedSeconds))
+                }
+            }
+            HStack(spacing: 10) {
+                Button("Practice again", action: model.practiceAgain).buttonStyle(GoldButtonStyle())
+                    .keyboardShortcut(.return, modifiers: [])
+                    .accessibilityIdentifier("practice-again")
+                Button("Close", action: model.close).buttonStyle(QuietButtonStyle())
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("completion")
+    }
+
+    private func completionTime(_ name: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(name).font(.system(size: 9, weight: .medium)).tracking(1.5).foregroundColor(Palette.muted)
+            Text(value).font(.system(size: compact ? 20 : 24, weight: .light)).monospacedDigit().foregroundColor(Palette.ivory)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     /// Cycle, the five steps, the average per step, and the cycle's total, in shares of the width. The

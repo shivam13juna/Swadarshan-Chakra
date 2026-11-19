@@ -8,6 +8,9 @@
   --ivory: #f5edd9;
   --muted: #a8adba;
   --error: #ffb091;
+  /* Cycles, wherever the journey counts them: sky blue against the gold of time; deep blue on full gold. */
+  --cycles: #94c4ff;
+  --cycles-on-gold: #1c3d7a;
   --serif: ui-serif, "New York", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --rounded: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -213,13 +216,15 @@ button { cursor: pointer; }
   .shortcut { display: none; }
 }
 
-/* Overview: header, the five forms in a circle, the practice panel, and the footer. */
+/* Overview: header, the five forms in a circle, the practice panel, and the footer. Setup fills the
+   window and scrolls down to the journey; completion sets the journey beside the practice's time. */
 
 .overview {
+  --gutter: 46px;
   display: flex;
   flex-direction: column;
   gap: 23px;
-  padding: 30px 46px 29px;
+  padding: 30px var(--gutter) 29px;
 }
 
 .overview-header {
@@ -301,11 +306,44 @@ button { cursor: pointer; }
   background: rgba(217, 184, 117, 0.75);
 }
 
+/* Edge to edge, so its scroll bar sits at the window's edge. */
+.overview-scroll {
+  flex: 1;
+  min-height: 0;
+  margin-inline: calc(-1 * var(--gutter));
+  padding-inline: var(--gutter);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The first screen: the circle and the practice panel, the height of the window's middle. */
 .overview-body {
   display: flex;
-  flex: 1;
   gap: 40px;
+  height: 100%;
+}
+
+/* Completion: the journey in the circle's place, scrolling on its own; the time beside it stays in view.
+   On the largest displays the two stay together, centred. */
+#app[data-phase="complete"] .overview-scroll {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  overflow: hidden;
+}
+
+#app[data-phase="complete"] .overview-body { order: 2; flex: none; height: auto; }
+#app[data-phase="complete"] .orbit { display: none; }
+
+#app[data-phase="complete"] .journey {
+  order: 1;
+  flex: 0 1 1480px;
+  min-width: 0;
   min-height: 0;
+  margin: 0;
+  padding-top: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .overview-footer {
@@ -346,14 +384,15 @@ button { cursor: pointer; }
 
 #app[data-phase="complete"] .setup-panel { display: none; }
 
-/* TimeSummaryPanel: on completion, in the setup panel's place. */
+/* TimeSummaryPanel: on completion, in the setup panel's place, its top level with the journey's. */
 .summary-panel {
   display: none;
   flex: none;
   flex-direction: column;
-  align-self: center;
+  align-self: flex-start;
   gap: 18px;
   /* Wide enough on a large display for every column title to fit on one line. */
+  container: summary / inline-size;
   width: clamp(470px, 36vw, 560px);
   max-height: 100%;
   padding: 28px;
@@ -364,7 +403,68 @@ button { cursor: pointer; }
 
 #app[data-phase="complete"] .summary-panel { display: flex; }
 
-.summary-panel .setup-title { font-size: 32px; }
+/* Complete: the cycles done, the time practiced against the time planned, and the way on. */
+.completion { display: flex; flex: none; flex-direction: column; gap: 18px; }
+.completion-head { display: flex; align-items: center; gap: 14px; }
+
+.seal {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.completion-title {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.completion-cycles {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.completion-summary {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.completion-summary .label {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.completion-summary .value {
+  margin-top: 5px;
+  font-size: 24px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+
+.completion-divider { width: 1px; height: 32px; background: rgba(217, 184, 117, 0.25); }
+.completion-buttons { display: flex; gap: 10px; }
+
+.summary-intro { display: flex; flex: none; flex-direction: column; gap: 8px; }
+
+.summary-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1.12;
+}
 
 .summary-note { color: var(--muted); font-size: 12px; line-height: 1.55; }
 
@@ -421,6 +521,19 @@ button { cursor: pointer; }
 .time-table tbody th { color: var(--muted); font-weight: 500; }
 .time-table tbody td { color: rgba(245, 237, 217, 0.86); }
 .time-table tbody tr { border-bottom: 0.5px solid rgba(245, 237, 217, 0.06); }
+
+/* A narrower panel takes the compact panel's columns: every title still fits its own, the last two on two lines. */
+@container summary (max-width: 509px) {
+  .time-table thead th { height: 41px; }
+  .time-table thead th,
+  .time-table tfoot th { letter-spacing: 0.4px; }
+  .time-table thead th:first-child { letter-spacing: 0.2px; }
+  .time-table thead th:nth-child(n + 7) { font-size: 8.5px; letter-spacing: 0.3px; }
+  .time-table th:first-child { width: 10%; }
+  .time-table th:nth-child(n + 2):nth-child(-n + 6) { width: 10.4%; }
+  .time-table th:nth-child(n + 7) { width: 19%; }
+  .title-break { display: inline; }
+}
 
 .time-table .total { color: var(--ivory); font-weight: 500; }
 .time-table .average { color: var(--gold); font-weight: 500; }
@@ -591,69 +704,33 @@ button { cursor: pointer; }
 
 .orbit.is-crowded.is-preview .orbit-chakra { display: block; }
 .orbit.is-crowded.is-preview .active-focus { display: none; }
-.orbit.is-crowded.is-complete .stage-card,
-.orbit.is-crowded.is-complete .orbit-rings { display: none; }
 
-.completion-focus {
-  display: flex;
-  flex-direction: column;
+/* "Your journey", in the open space at the foot of the circle (MeditationView's journeyCue). */
+.journey-cue {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  z-index: 1;
+  display: inline-flex;
   align-items: center;
-  gap: 19px;
-  text-align: center;
-}
-
-.seal {
-  width: 40px;
-  height: 40px;
-  fill: none;
-  stroke: var(--gold);
-  stroke-width: 1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.completion-title {
-  font-family: var(--serif);
-  font-size: 32px;
-  font-weight: 400;
-  line-height: 1.2;
-}
-
-.completion-cycles {
-  margin-top: 7px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.completion-summary {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 4px 0;
-}
-
-.completion-summary .label {
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(7, 10, 21, 0.9);
   color: var(--muted);
   font-size: 9px;
   font-weight: 500;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
+  line-height: 1.2;
   text-transform: uppercase;
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 
-.completion-summary .value {
-  margin-top: 6px;
-  font-size: 24px;
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
-}
+.journey-cue .icon { width: 9px; height: 9px; stroke-width: 2; }
+.journey-cue:focus-visible { outline: 1px solid var(--gold); outline-offset: 2px; }
 
-.completion-divider { width: 1px; height: 32px; background: rgba(217, 184, 117, 0.25); }
-
-.orbit-focus.is-short .completion-focus { gap: 11px; }
-.orbit-focus.is-short .seal { width: 30px; height: 30px; }
-.orbit-focus.is-short .completion-title { font-size: 25px; }
-.orbit-focus.is-short .completion-summary { padding: 0; }
-.orbit-focus.is-short .completion-summary .value { font-size: 20px; }
 
 /* SetupPanel */
 
@@ -869,19 +946,26 @@ button { cursor: pointer; }
 
 /* Smaller windows (MeditationView's compact layout) */
 @media (max-width: 1179px), (max-height: 759px) {
-  .overview { gap: 13px; padding: 20px 26px; }
+  .overview { --gutter: 26px; gap: 13px; padding: 20px var(--gutter); }
   .overview-header { height: 43px; }
   .brand-mark { width: 40px; height: 40px; }
   .brand-hindi { font-size: 23px; }
   .status { margin-right: 8px; }
-  .overview-body { gap: 22px; }
+  .overview-body,
+  #app[data-phase="complete"] .overview-scroll { gap: 22px; }
   /* Tighter spacing leaves room for the countdown-bar setting at 1024 × 640. */
   .setup-panel { gap: 14px; width: 286px; padding: 22px; }
   .setup-intro { gap: 9px; }
   .setup-title { font-size: 28px; }
   .setup-fields { gap: 16px; }
   .summary-panel { gap: 12px; width: 372px; padding: 22px; }
-  .summary-panel .setup-title { font-size: 26px; }
+  .completion { gap: 14px; }
+  .completion-head { gap: 12px; }
+  .seal { width: 31px; height: 31px; }
+  .completion-title { font-size: 25px; }
+  .completion-summary .value { font-size: 20px; }
+  .summary-intro { gap: 6px; }
+  .summary-title { font-size: 21px; }
   .summary-note { font-size: 11px; }
   .time-table { font-size: 11px; }
   .time-table th,
@@ -907,12 +991,26 @@ button { cursor: pointer; }
     -webkit-overflow-scrolling: touch;
   }
 
-  .overview-body { flex: none; flex-direction: column; gap: 22px; }
+  /* The whole page scrolls: the circle, the panel, then the journey; on completion, the panel first. */
+  .overview-scroll,
+  #app[data-phase="complete"] .overview-scroll {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 30px;
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow: visible;
+  }
+
+  .overview-body { flex: none; flex-direction: column; gap: 22px; height: auto; }
+  #app[data-phase="complete"] .overview-body { order: 1; }
+  #app[data-phase="complete"] .journey { order: 2; flex: none; overflow: visible; }
   .orbit { flex: none; width: 100%; height: min(112vw, 560px); }
-  #app[data-phase="complete"] .orbit { height: auto; min-height: 380px; }
+  .journey-cue { display: none; }
   .setup-panel { width: 100%; max-width: 440px; }
   /* The page scrolls instead of the table. */
-  .summary-panel { width: 100%; max-width: 440px; max-height: none; }
+  .summary-panel { align-self: center; width: 100%; max-width: 440px; max-height: none; }
   .time-table-wrap { overflow: visible; }
   .time-table thead th,
   .time-table tfoot th,
@@ -1180,6 +1278,375 @@ button { cursor: pointer; }
   .stage-controls,
   .controls-group { align-items: flex-start; }
 }
+
+/* Today's practice so far, in the setup header (MeditationView's todayButton). It leads down to the journey. */
+.header-button { gap: 7px; }
+.header-button .icon { width: 14px; height: 14px; }
+.today-button { gap: 9px; white-space: nowrap; }
+.today-label { color: var(--muted); font-size: 9px; font-weight: 500; letter-spacing: 1.6px; text-transform: uppercase; }
+.today-practice { display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.today-time { color: var(--ivory); }
+.today-dot,
+.today-none { color: var(--muted); }
+.today-button .today-chevron { width: 10px; height: 10px; color: var(--gold); stroke-width: 2; }
+#app[data-phase="complete"] .today-button { display: none; }
+
+/* Cycles, wherever the journey counts them: a turning arrow and the count, in blue against the gold of time. */
+.cycle-count { display: inline-flex; align-items: center; gap: 0.2em; color: var(--cycles); }
+.cycle-icon { width: 0.8em; height: 0.8em; stroke-width: 2.2; }
+
+/* JourneyView: below setup, a scroll away, a page of its own once scrolled to; on completion, the column
+   beside the time. It arranges itself by its own width, as the Mac app does: wide, from 1150 points; medium,
+   from 720; narrow below that. */
+
+.journey {
+  container: journey / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 1480px;
+  min-height: 100%;
+  margin: 34px auto 0;
+  padding-bottom: 4px;
+}
+
+.journey-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 20px; }
+.journey-intro { display: flex; flex-direction: column; gap: 10px; }
+.journey-intro .setup-title:focus { outline: none; }
+.backup { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.backup-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.backup-buttons .quiet-button { gap: 8px; }
+.backup-buttons .icon { width: 14px; height: 14px; }
+.backup-buttons .quiet-button:disabled { opacity: 0.45; cursor: default; }
+.backup-message { max-width: 430px; color: var(--muted); font-size: 11px; line-height: 1.45; text-align: right; }
+.backup-message.is-result { color: var(--gold); }
+
+.journey-card {
+  padding: 20px;
+  border: 0.7px solid rgba(217, 184, 117, 0.17);
+  border-radius: 15px;
+  background: linear-gradient(to bottom right, rgba(16, 20, 31, 0.85), rgba(16, 20, 31, 0.45));
+}
+
+.journey-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 70px 24px;
+  text-align: center;
+}
+
+.empty-icon { width: 38px; height: 38px; fill: none; stroke: var(--gold); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+.empty-title { margin: 0; font-family: var(--serif); font-size: 26px; font-weight: 400; line-height: 1.25; }
+.empty-note { max-width: 520px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+.journey-content { display: flex; flex-direction: column; gap: 18px; }
+
+/* Five in a row, or three and two where five won't fit; tiles in a row share its height. */
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+.tile { display: flex; flex-direction: column; gap: 8px; min-height: 80px; padding: 16px; }
+
+.tile .label {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tile .value {
+  overflow: hidden;
+  font-family: var(--rounded);
+  font-size: 24px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#tile-cycles { color: var(--cycles); }
+.tile .detail { display: flex; align-items: baseline; gap: 4px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.tile .detail.is-up { color: var(--gold); }
+.tile .detail .icon { position: relative; top: 1px; width: 9px; height: 9px; stroke-width: 2.4; }
+
+/* Wide: the calendar beside the trend and, under it, the hours of the week; the trend takes whatever
+   height the calendar leaves it. */
+.journey-grid {
+  display: grid;
+  grid-template-columns: 460px minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  grid-template-areas: "calendar trend" "calendar rhythm";
+  gap: 16px;
+}
+
+.calendar-card { display: flex; grid-area: calendar; flex-direction: column; gap: 12px; }
+.trend-card { display: flex; grid-area: trend; flex-direction: column; gap: 12px; }
+.rhythm-card { container: rhythm / inline-size; display: flex; grid-area: rhythm; flex-direction: column; gap: 12px; }
+
+.calendar-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card-title { margin: 5px 0 0; font-family: var(--serif); font-size: 21px; font-weight: 400; line-height: 1.2; }
+.month-buttons { display: flex; gap: 8px; }
+
+.month-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0.7px solid rgba(245, 237, 217, 0.14);
+  border-radius: 50%;
+  background: rgba(245, 237, 217, 0.04);
+  color: var(--gold);
+}
+
+.month-button .icon { width: 11px; height: 11px; stroke-width: 2; }
+.month-button:disabled { color: rgba(168, 173, 186, 0.4); cursor: default; }
+.month-button:focus-visible { outline: none; border-color: var(--gold); }
+
+.calendar-weekdays,
+.calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+
+.calendar-weekdays span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* A day: its number; then its cycles, bottom left, in blue, and its time, bottom right. */
+.day {
+  position: relative;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(245, 237, 217, 0.045);
+  color: rgba(245, 237, 217, 0.85);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-number { position: absolute; top: 4px; left: 6px; line-height: 1.2; }
+
+.day-cycles {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.day-cycles .cycle-icon { stroke-width: 2.6; }
+
+.day-time {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  color: rgba(245, 237, 217, 0.75);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* From an empty day or hour to a full one: faint ivory, then four depths of gold (Journey.heatColor). */
+.day[data-level="1"], .heat-cell[data-level="1"] { background: rgba(217, 184, 117, 0.24); }
+.day[data-level="2"], .heat-cell[data-level="2"] { background: rgba(217, 184, 117, 0.45); }
+.day[data-level="3"], .heat-cell[data-level="3"] { background: rgba(217, 184, 117, 0.7); }
+.day[data-level="4"], .heat-cell[data-level="4"] { background: rgba(217, 184, 117, 0.95); }
+.day[data-level="3"], .day[data-level="4"] { color: var(--bg); }
+.day[data-level="3"] .day-time,
+.day[data-level="4"] .day-time { color: rgba(7, 10, 21, 0.85); }
+.day[data-level="3"] .day-cycles,
+.day[data-level="4"] .day-cycles { color: var(--cycles-on-gold); }
+.day.is-today { box-shadow: inset 0 0 0 1px var(--gold); font-weight: 600; }
+.day.is-selected { box-shadow: inset 0 0 0 1.5px var(--ivory); }
+.day:disabled { color: rgba(245, 237, 217, 0.3); cursor: default; }
+.day:focus-visible { outline: 2px solid var(--ivory); outline-offset: 1px; }
+.day.is-blank { visibility: hidden; }
+
+.card-rule { height: 0.7px; background: rgba(217, 184, 117, 0.14); }
+
+.day-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 62px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-detail-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.day-detail-title { color: var(--ivory); font-size: 13px; font-weight: 500; }
+.day-detail-totals { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }
+.day-detail-time { color: var(--gold); }
+
+.trend-headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.trend-headline .icon { width: 19px; height: 19px; color: var(--gold); stroke-width: 1.3; }
+.card-note { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+/* The chart grows, up to a point, when the card beside it is taller, and sits at the foot of the card. */
+.trend-plot { display: flex; flex: 1; flex-direction: column; justify-content: flex-end; gap: 6px; padding-top: 14px; }
+.trend-chart { position: relative; display: flex; flex: 1 1 88px; align-items: flex-end; gap: 7px; min-height: 88px; max-height: 190px; }
+.trend-bar { flex: 1; min-width: 0; border-radius: 3px; background: rgba(217, 184, 117, 0.88); }
+.trend-bar.is-current { background: rgba(217, 184, 117, 0.5); }
+.trend-bar.is-empty { background: rgba(245, 237, 217, 0.07); }
+.trend-most { position: absolute; top: -14px; right: 0; color: var(--muted); font-size: 9px; font-weight: 500; }
+
+.trend-labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+/* The hours of the week beside their notes when the card is wide enough, above them when it isn't. */
+.rhythm { display: flex; align-items: flex-start; gap: 22px; }
+
+.heat-map {
+  display: grid;
+  flex: 1 1 520px;
+  grid-template-columns: 26px repeat(24, minmax(0, 1fr));
+  gap: 3px;
+  max-width: 520px;
+}
+
+.heat-label { color: var(--muted); font-size: 9px; font-weight: 500; line-height: 15px; }
+.heat-cell { height: 15px; border-radius: 2.5px; background: rgba(245, 237, 217, 0.045); }
+.heat-mark { grid-column: span 3; padding-top: 2px; color: var(--muted); font-size: 8.5px; font-weight: 500; }
+
+.rhythm-notes { display: flex; flex: 1; flex-direction: column; gap: 9px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.rhythm-notes li { position: relative; padding-left: 12px; color: rgba(245, 237, 217, 0.86); font-size: 12px; line-height: 1.5; }
+
+.rhythm-notes li::before {
+  content: "";
+  position: absolute;
+  top: 0.62em;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(217, 184, 117, 0.8);
+}
+
+@container rhythm (max-width: 799px) {
+  .rhythm { flex-direction: column; gap: 14px; }
+  .heat-map { flex: none; width: 100%; max-width: none; }
+}
+
+/* Smaller type and padding in a compact window, and in any arrangement but the widest. The two blocks
+   say the same: one for the window, one for the journey's own width. */
+@media (max-width: 1179px), (max-height: 759px) {
+  .journey { gap: 14px; margin-top: 26px; }
+  .journey .setup-title { font-size: 28px; }
+  .journey-intro { gap: 7px; }
+  .journey-content { gap: 14px; }
+  .tiles { gap: 10px; }
+  .tile { gap: 6px; min-height: 70px; padding: 13px; }
+  .tile .value { font-size: 20px; }
+  .journey-card { padding: 16px; }
+  .journey-empty { padding: 40px 24px; }
+  .empty-title { font-size: 22px; }
+  .journey-grid { gap: 14px; }
+  .calendar-card, .trend-card { gap: 10px; }
+  .card-title { font-size: 19px; }
+  .day { height: 38px; }
+  .trend-headline { font-size: 22px; }
+  .trend-chart { gap: 5px; flex-basis: 92px; min-height: 92px; }
+  .heat-cell { height: 13px; }
+  .heat-label { line-height: 13px; }
+}
+
+@container journey (max-width: 1149px) {
+  .journey .setup-title { font-size: 28px; }
+  .journey-intro { gap: 7px; }
+  .journey-content { gap: 14px; }
+  .tiles { gap: 10px; }
+  .tile { gap: 6px; min-height: 70px; padding: 13px; }
+  .tile .value { font-size: 20px; }
+  .journey-card { padding: 16px; }
+  .journey-empty { padding: 40px 24px; }
+  .empty-title { font-size: 22px; }
+  .calendar-card, .trend-card { gap: 10px; }
+  .card-title { font-size: 19px; }
+  .day { height: 38px; }
+  .trend-headline { font-size: 22px; }
+  .trend-chart { gap: 5px; flex-basis: 92px; min-height: 92px; }
+  .heat-cell { height: 13px; }
+  .heat-label { line-height: 13px; }
+
+  /* Medium: the calendar beside the trend, the hours of the week below. */
+  .journey-grid {
+    grid-template-columns: 440px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    grid-template-areas: "calendar trend" "rhythm rhythm";
+    gap: 14px;
+  }
+}
+
+/* With the title and the backup buttons wrapped, both keep to the left. */
+@container journey (max-width: 759px) {
+  .backup { align-items: flex-start; }
+  .backup-message { text-align: left; }
+}
+
+@container journey (max-width: 699px) {
+  .tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .tile { grid-column: span 2; }
+  .tile:nth-child(n + 4) { grid-column: span 3; }
+}
+
+/* Narrow: one column. */
+@container journey (max-width: 719px) {
+  .journey-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "calendar" "trend" "rhythm"; }
+}
+
+/* Phones: the hours of the week in finer cells, the tiles two by two. */
+@media (max-width: 759px), (max-height: 539px) {
+  .journey { min-height: 0; margin-top: 0; }
+  .heat-map { grid-template-columns: 22px repeat(24, minmax(0, 1fr)); gap: 2px; }
+  .heat-cell { height: 11px; border-radius: 2px; }
+  .heat-label { line-height: 11px; }
+  .heat-mark { font-size: 8px; }
+  .trend-chart { gap: 4px; }
+}
+
+@container journey (max-width: 479px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile,
+  .tile:nth-child(n + 4) { grid-column: auto; }
+  .tile:last-child { grid-column: span 2; }
+}
+
+@container journey (max-width: 479px) {
+  .day { height: 50px; }
+  .day-cycles { bottom: 18px; }
+}
+
+@media (max-width: 479px) {
+  .overview-header { flex-wrap: wrap; row-gap: 12px; height: auto; }
+  .today-button { order: 1; flex: 1 0 100%; justify-content: center; }
+}
+
 
 /* ConfirmationOverlay */
 

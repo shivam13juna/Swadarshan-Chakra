@@ -7,6 +7,7 @@ on:
     paths:
       - "web/**"
       - "Tests/web/**"
+      - "Tests/fixtures/**"
       - "firebase.json"
       - ".firebaserc"
       - ".github/workflows/website.yml"
@@ -35,6 +36,10 @@ jobs:
 
       - name: Check the practice engine
         run: node Tests/web/engine-checks.mjs
+
+      # The same fixture as the Mac app's core checks: each reads the other's backups.
+      - name: Check the practice history
+        run: node Tests/web/history-checks.mjs
 
       - name: Deploy to Firebase Hosting
         env:

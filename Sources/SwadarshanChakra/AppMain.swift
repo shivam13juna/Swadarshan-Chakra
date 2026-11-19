@@ -66,9 +66,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSApp.terminate(nil)
             return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--verify-backup"),
+           CommandLine.arguments.indices.contains(index + 1) {
+            // Reads a backup as Import Backup does, and says what it holds; nothing is saved.
+            let url = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            do {
+                let (history, skipped) = try PracticeHistory.read(Data(contentsOf: url))
+                let insights = PracticeInsights(history, today: PracticeTime(Date())?.dayNumber ?? 0,
+                                                firstWeekday: Calendar.current.firstWeekday - 1)
+                print("\(url.lastPathComponent): \(HistoryText.count(history.records.count, "practice")), \(skipped) left out")
+                if let first = insights.firstDay {
+                    print("Since \(HistoryText.date(first)) · \(HistoryText.minutes(insights.all.seconds)) in all · \(insights.all.cycles) cycles")
+                }
+                print("Today \(HistoryText.minutes(insights.todayTotals.seconds)) · last 7 days \(HistoryText.minutes(insights.last7)) · last 30 days \(HistoryText.minutes(insights.last30)) · streak \(insights.streakValue) · \(insights.trendTitle)")
+                exit(0)
+            } catch let error as PracticeHistory.ReadError {
+                fputs(error.message(for: url.lastPathComponent) + "\n", stderr)
+            } catch {
+                fputs("\(url.lastPathComponent) couldn't be opened: \(error.localizedDescription)\n", stderr)
+            }
+            exit(1)
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--render-previews"),
            CommandLine.arguments.indices.contains(index + 1) {
             PreviewRenderer.render(artwork: artwork, directory: CommandLine.arguments[index + 1])
+            return
+        }
+        if CommandLine.arguments.contains("--verify-history") {
+            Task { @MainActor in
+                do {
+                    try verifyHistory()
+                    print("Practice history verification passed.")
+                    NSApp.terminate(nil)
+                } catch {
+                    fputs("Practice history verification failed: \(error.localizedDescription)\n", stderr)
+                    exit(1)
+                }
+            }
             return
         }
         if CommandLine.arguments.contains("--verify-timer") {
@@ -85,7 +119,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         let smokeTest = CommandLine.arguments.contains("--smoke-test")
-        model = SessionModel(defaults: smokeTest ? UserDefaults(suiteName: "com.swadarshan.chakra.smoke")! : .standard)
+        // The smoke test keeps its practices in memory, away from the practitioner's own history.
+        model = SessionModel(defaults: smokeTest ? UserDefaults(suiteName: "com.swadarshan.chakra.smoke")! : .standard,
+                             store: smokeTest ? nil : .standard())
         // One meditation window; keep tab-bar items out of the View menu.
         NSWindow.allowsAutomaticWindowTabbing = false
         model.hideWindow = { [weak self] in self?.hideMeditation() }
@@ -131,6 +167,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         appItem.submenu = appMenu
         main.addItem(appItem)
 
+        // The practice history travels between devices as a backup file.
+        let fileItem = NSMenuItem()
+        let file = NSMenu(title: "File")
+        file.addItem(withTitle: "Export Backup…", action: #selector(exportBackup), keyEquivalent: "e")
+            .keyEquivalentModifierMask = [.shift, .command]
+        file.addItem(withTitle: "Import Backup…", action: #selector(importBackup), keyEquivalent: "i")
+            .keyEquivalentModifierMask = [.shift, .command]
+        file.items.forEach { $0.target = self }
+        fileItem.submenu = file
+        main.addItem(fileItem)
+
         // Keep native text editing and the standard shortcuts available in setup fields.
         let editItem = NSMenuItem()
         let edit = NSMenu(title: "Edit")
@@ -144,6 +191,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // The standard full-screen toggle. AppKit retitles it "Exit Full Screen" while in full screen.
         let viewItem = NSMenuItem()
         let view = NSMenu(title: "View")
+        view.addItem(withTitle: "Your Journey", action: #selector(showJourney), keyEquivalent: "j").target = self
+        view.addItem(.separator())
         view.addItem(withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
             .keyEquivalentModifierMask = [.control, .command]
         viewItem.submenu = view
@@ -163,6 +212,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
             menu.addItem(withTitle: "Open Meditation", action: #selector(showMeditation), keyEquivalent: "").target = self
+            menu.addItem(withTitle: "Your Journey", action: #selector(showJourney), keyEquivalent: "").target = self
             menu.addItem(.separator())
             menu.addItem(withTitle: "Quit Swadarshan Chakra", action: #selector(requestQuit), keyEquivalent: "q").target = self
             statusItem.menu = menu
@@ -209,6 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if fullScreenOnOpen && fullScreenTransition == nil && !window.styleMask.contains(.fullScreen) {
             window.setFrame(screen.visibleFrame, display: true)
         }
+        model.beginNewDayIfNeeded()
         updateWindowContent()
         if NSApp.isHidden { NSApp.unhide(nil) }
         NSApp.activate(ignoringOtherApps: true)
@@ -222,6 +273,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// Closing: the practice ends (see SessionModel.close), then the window goes and the app stays in the menu bar.
     @objc private func closeMeditation() { model.close() }
+
+    /// The journey, in the meditation window: below setup, beside a finished practice. Not during a practice.
+    @objc private func showJourney() {
+        guard model.engine.phase == .ready || model.engine.phase == .complete else { return }
+        showMeditation()
+        model.showJourney()
+    }
+
+    /// Backups are made and read with the journey in view, where what they did is shown.
+    @objc private func exportBackup() {
+        guard model.engine.phase == .ready || model.engine.phase == .complete else { return }
+        showJourney()
+        model.exportHistory()
+    }
+
+    @objc private func importBackup() {
+        guard model.engine.phase == .ready || model.engine.phase == .complete else { return }
+        showJourney()
+        model.importHistory()
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard let model else { return true }
+        let between = model.engine.phase == .ready || model.engine.phase == .complete
+        switch menuItem.action {
+        case #selector(showJourney), #selector(importBackup): return between
+        case #selector(exportBackup): return between && !model.history.isEmpty
+        default: return true
+        }
+    }
 
     @objc func hideMeditation() {
         wantsMeditationVisible = false
@@ -441,6 +522,103 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         DistributedNotificationCenter.default().removeObserver(self)
         NotificationCenter.default.removeObserver(self)
+    }
+
+    /// Practices run through a real SessionModel, as Space, End, Restart, and closing drive them, kept in a
+    /// history file of their own in a temporary folder; the practitioner's history is never touched.
+    private func verifyHistory() throws {
+        let suiteName = "com.swadarshan.chakra.history-check"
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("swadarshan-history-check-\(UUID().uuidString)", isDirectory: true)
+        let file = folder.appendingPathComponent("practice-history.json")
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let probe = SessionModel(defaults: UserDefaults(suiteName: suiteName)!, automaticTicks: false, store: .file(at: file))
+        func require(_ condition: Bool, _ name: String) throws {
+            guard condition else {
+                throw NSError(domain: "HistoryCheck", code: 1, userInfo: [NSLocalizedDescriptionKey: name])
+            }
+            print("PASS \(name)")
+        }
+        func practice(cycles: Int) {
+            probe.cyclesText = String(cycles)
+            probe.minutesText = "0"
+            probe.secondsText = "05"
+            probe.begin()
+        }
+        /// Space through one whole cycle: the cycle card, then each step and the card before the next.
+        func spinCycle() { for _ in 0..<10 { probe.nextStage() } }
+        func onDisk() -> [PracticeRecord] {
+            (try? PracticeHistory.read(Data(contentsOf: file)).history.records) ?? []
+        }
+
+        /// The practices kept with these cycles done, of these planned. Practices begun within the same
+        /// second are ordered by id, so they're found by what they hold.
+        func kept(_ cycles: Int, of planned: Int) -> Int {
+            probe.history.records.filter { $0.cycles == cycles && $0.planned == planned }.count
+        }
+        try require(probe.history.isEmpty && !FileManager.default.fileExists(atPath: file.path), "A new history starts empty")
+        practice(cycles: 1)
+        spinCycle()
+        let first = probe.history.records.first
+        try require(probe.engine.phase == .complete && probe.history.records.count == 1 && first?.cycles == 1
+                    && first?.planned == 1 && first?.device == "mac", "A completed cycle is kept")
+        try require(onDisk() == probe.history.records, "and written to the history file")
+        try require(probe.insights.todayTotals.practices == 1 && probe.insights.todayTotals.cycles == 1
+                    && probe.insights.currentStreak == 1, "The completion screen's journey counts it")
+        probe.practiceAgain()
+        practice(cycles: 2)
+        spinCycle()
+        probe.request(.end)
+        probe.confirm()
+        try require(probe.engine.phase == .ready && probe.history.records.count == 2 && kept(1, of: 2) == 1,
+                    "An ended practice is kept with the cycles done")
+        practice(cycles: 3)
+        spinCycle()
+        probe.close()
+        try require(probe.history.records.count == 3 && kept(1, of: 3) == 1, "Closing the window keeps the practice so far")
+        practice(cycles: 2)
+        spinCycle()
+        probe.request(.restart)
+        probe.confirm()
+        try require(probe.engine.phase == .running && probe.history.records.count == 4 && kept(1, of: 2) == 2,
+                    "Restarting keeps the practice it ends, and begins another")
+        probe.nextStage()
+        probe.close()
+        try require(probe.history.records.count == 4, "A practice with neither a minute nor a whole cycle is not kept")
+        try require(Set(onDisk().map(\.id)).count == 4 && PracticeStore.file(at: file).initial == probe.history,
+                    "Each practice is on disk once, and reads back the same")
+
+        try require(probe.insights.todayTotals.practices == 4 && probe.insights.todayTotals.cycles == 4,
+                    "Setup's today counts every practice and cycle kept today")
+        probe.showJourney()
+        try require(probe.journeyRequested, "Setup can be taken down to the journey")
+        probe.journeyRequested = false
+        practice(cycles: 1)
+        probe.showJourney()
+        try require(!probe.journeyRequested, "but not during a practice")
+        probe.close()
+
+        let kept = probe.history.records[0]
+        let other = PracticeRecord(id: "from-the-web", start: PracticeTime("2026-11-17T06:00:00+05:30")!, seconds: 900,
+                                   cycles: 3, planned: 3, timing: .total, steps: nil, device: "web")!
+        let backup = folder.appendingPathComponent("backup.json")
+        try PracticeHistory([kept, other]).document(exported: PracticeTime(Date())).write(to: backup)
+        probe.importHistory(from: backup)
+        try require(probe.history.records.count == 5 && probe.backupMessage == "Added 1 practice from “backup.json”. 1 was already here.",
+                    "Import adds what's new and says so")
+        try require(onDisk().count == 5, "and keeps it")
+        try Data("{\"format\": \"something-else\"}".utf8).write(to: backup)
+        probe.importHistory(from: backup)
+        try require(probe.history.records.count == 5 && probe.backupMessage == "“backup.json” isn't a Swadarshan Chakra backup.",
+                    "A file that isn't a backup changes nothing")
+        try Data("not json".utf8).write(to: file)
+        let reopened = PracticeStore.file(at: file)
+        let setAside = (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?
+            .contains { $0.hasPrefix("practice-history (unreadable") } == true
+        try require(reopened.initial.isEmpty && setAside, "An unreadable history file is set aside, not written over")
     }
 
     /// Native integration checks without Accessibility permissions. The long timer probe uses a

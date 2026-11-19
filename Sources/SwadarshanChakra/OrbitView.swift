@@ -17,7 +17,7 @@ struct OrbitView: View {
             let centerY = (height + radiusY * (1 - cos(.pi / 5))) / 2
             // The lower cards sit to either side of the center. Use that open central space
             // for a larger focus image, especially for the differently shaped second picture.
-            let extraFocusHeight: CGFloat = model.engine.phase == .ready ? 20 : (model.engine.phase == .complete ? 0 : 80)
+            let extraFocusHeight: CGFloat = model.engine.phase == .ready ? 20 : 80
             let focusHeight = max(126, radiusY * (1 + cos(.pi / 5)) - cardHeight - 30) + extraFocusHeight
             let focusWidth = min(width * 0.44, 420)
 
@@ -41,25 +41,19 @@ struct OrbitView: View {
                 ForEach(Stage.all) { stage in
                     let angle = Double(stage.id - 1) * 2 * .pi / 5 - .pi / 2
                     StageCard(stage: stage, image: artwork.image(for: stage), width: cardWidth,
-                              active: model.engine.phase != .complete && model.engine.currentStage.id == stage.id,
+                              active: model.engine.currentStage.id == stage.id,
                               preview: model.engine.phase == .ready)
                         .frame(width: cardWidth, height: cardHeight)
                         .position(x: width / 2 + cos(angle) * radiusX, y: centerY + sin(angle) * radiusY)
                 }
 
-                Group {
-                    if model.engine.phase == .complete {
-                        CompletionFocus(model: model, compact: focusHeight < 280)
-                    } else {
-                        ActiveFocus(stage: model.engine.currentStage, artwork: artwork,
-                                    availableHeight: focusHeight, paused: model.engine.phase == .paused || model.engine.phase == .confirming)
-                            .id(model.engine.currentStage.id)
-                            .transition(.opacity)
-                    }
-                }
-                .frame(width: focusWidth, height: focusHeight)
-                .position(x: width / 2, y: height / 2 + extraFocusHeight / 2)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: model.engine.currentStage.id)
+                ActiveFocus(stage: model.engine.currentStage, artwork: artwork,
+                            availableHeight: focusHeight, paused: model.engine.phase == .paused || model.engine.phase == .confirming)
+                    .id(model.engine.currentStage.id)
+                    .transition(.opacity)
+                    .frame(width: focusWidth, height: focusHeight)
+                    .position(x: width / 2, y: height / 2 + extraFocusHeight / 2)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: model.engine.currentStage.id)
             }
         }
         .accessibilityElement(children: .contain)
@@ -134,45 +128,5 @@ private struct ActiveFocus: View {
                 .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-private struct CompletionFocus: View {
-    @ObservedObject var model: SessionModel
-    let compact: Bool
-
-    var body: some View {
-        VStack(spacing: compact ? 11 : 19) {
-            Image(systemName: "checkmark.seal")
-                .font(.system(size: compact ? 28 : 38, weight: .ultraLight)).foregroundColor(Palette.gold)
-            VStack(spacing: 7) {
-                Text("Meditation complete")
-                    .font(.system(size: compact ? 25 : 32, weight: .regular, design: .serif))
-                    .foregroundColor(Palette.ivory)
-                Text("\(model.engine.completedCycles) \(model.engine.completedCycles == 1 ? "cycle" : "cycles") completed")
-                    .font(.system(size: 13)).foregroundColor(Palette.muted)
-            }
-            // Practiced includes time paused with a step; freestyle planned no time to compare it with.
-            HStack(spacing: 24) {
-                summary("PRACTICED", TimeText.elapsed(model.engine.activeSeconds))
-                if model.engine.configuration.isTimed {
-                    Rectangle().fill(Palette.gold.opacity(0.25)).frame(width: 1, height: 32)
-                    summary("PLANNED", TimeText.elapsed(model.engine.configuration.plannedSeconds))
-                }
-            }.padding(.vertical, compact ? 0 : 4)
-            HStack(spacing: 10) {
-                Button("Practice again", action: model.practiceAgain).buttonStyle(GoldButtonStyle())
-                    .keyboardShortcut(.return, modifiers: [])
-                    .accessibilityIdentifier("practice-again")
-                Button("Close", action: model.close).buttonStyle(QuietButtonStyle())
-            }
-        }
-    }
-
-    private func summary(_ name: String, _ value: String) -> some View {
-        VStack(spacing: 6) {
-            Text(name).font(.system(size: 9, weight: .medium)).tracking(1.5).foregroundColor(Palette.muted)
-            Text(value).font(.system(size: compact ? 20 : 24, weight: .light)).monospacedDigit().foregroundColor(Palette.ivory)
-        }
     }
 }

@@ -5,11 +5,11 @@ import SwiftUI
 struct YugaDial: View {
     /// Where the hand points for each step, in degrees clockwise from twelve o'clock: the top, where the
     /// Confluence Age meets Sat Yuga (step 1); the middle of Sat Yuga's quarter (2); the middle of Dwapar
-    /// Yuga's (3); the middle of the Confluence Age's wedge, 336° to 360° in the picture (4); and the top
-    /// again (5), where the next cycle begins.
-    static let stepAngles: [Double] = [0, 45, 225, 348, 360]
+    /// Yuga's (3); the middle of the Confluence Age's wedge, 336° to 360° in the picture (4); and near
+    /// that wedge's end (5), 4° short of the top: the age is ending, but not yet over.
+    static let stepAngles: [Double] = [0, 45, 225, 348, 356]
     static let places = ["the top, where the Confluence Age meets Sat Yuga", "Sat Yuga", "Dwapar Yuga",
-                         "the Confluence Age", "the top, where the Confluence Age meets Sat Yuga"]
+                         "the Confluence Age", "the end of the Confluence Age, just short of Sat Yuga"]
 
     // Measured on the supplied pictures, as shares of their width and height.
     /// The swastika's centre on the dial.
