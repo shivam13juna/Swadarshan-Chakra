@@ -53,6 +53,20 @@ struct BrandMark: View {
     }
 }
 
+/// The shared gold aura behind the header and cycle card's chakra. It stays still as the image turns.
+struct BrandHalo: View {
+    let size: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(RadialGradient(colors: [Palette.gold.opacity(0.42), Palette.gold.opacity(0)],
+                                 center: .center, startRadius: 0, endRadius: size * 1.1))
+            .frame(width: size * 2.2, height: size * 2.2)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 /// The header's chakra: it turns once a minute in a soft gold halo. It turns only while the window
 /// can be seen (`active`) and holds still with Reduce Motion.
 struct SpinningBrandMark: View {
@@ -66,11 +80,7 @@ struct SpinningBrandMark: View {
             .frame(width: size, height: size)
             .accessibilityHidden(true)
             .background {
-                Circle()
-                    .fill(RadialGradient(colors: [Palette.gold.opacity(0.42), Palette.gold.opacity(0)],
-                                         center: .center, startRadius: 0, endRadius: size * 1.1))
-                    .frame(width: size * 2.2, height: size * 2.2)
-                    .allowsHitTesting(false)
+                BrandHalo(size: size)
             }
     }
 }

@@ -223,7 +223,7 @@ function pause(reason = PAUSED) {
 }
 
 /// Whether the practitioner is with the practice: the page is in front and has focus. Leaving pauses a
-/// running practice, and a pause counts as practice only while they're here (SessionModel.setPresent).
+/// running practice; only timed modes count pauses while they're here (SessionModel.setPresent).
 function setPresent(present) {
   const wasActive = engine.phase === "running" || engine.phase === "confirming";
   engine.setPresent(present, now());
@@ -642,7 +642,7 @@ function renderOverview() {
   } else {
     const count = engine.completedCycles;
     setText(byId("completed-cycles"), `${count} ${count === 1 ? "cycle" : "cycles"} completed`);
-    // Practiced includes time paused with a step; freestyle planned no time to compare it with.
+    // Timed practice includes pauses with a step; freestyle excludes pauses and has no planned time.
     setText(byId("practiced-time"), TimeText.elapsed(engine.activeSeconds));
     setText(byId("planned-time"), TimeText.elapsed(engine.configuration.plannedSeconds));
     byId("planned-divider").hidden = !engine.configuration.isTimed;
@@ -952,7 +952,7 @@ function timeRow(name, seconds, stepCount) {
 }
 
 /// For each cycle, the time practiced in each of its steps, its total, and its average per step; then
-/// all cycles together. Pauses with a step count; the cards and time away don't.
+/// all cycles together. Only timed modes count pauses with a step; cards and time away never count.
 function renderTimeSummary() {
   const cycles = engine.stepSeconds;
   const key = JSON.stringify(cycles);

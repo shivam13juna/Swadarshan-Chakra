@@ -184,8 +184,8 @@ export class SessionEngine {
     this.completedCycles = 0;
     this.remainingSeconds = 60;
     this.introductionRemaining = 0;
-    /// The time practiced: every running step, and every pause spent with the practice (isPresent).
-    /// Cards, confirmations, and time away never count.
+    /// The time practiced: every running step, plus pauses spent with a timed practice (isPresent).
+    /// Freestyle pauses, cards, confirmations, and time away never count.
     this.activeSeconds = 0;
     /// The same time, step by step: stepSeconds[cycle][step], for every cycle begun so far.
     this.stepSeconds = [];
@@ -285,12 +285,12 @@ export class SessionEngine {
       this.#accrue(now);
     }
     this.phase = "paused";
-    // Time paused with a step is practice too, while the practitioner is here.
+    // In timed mode, time paused with a step is practice too, while the practitioner is here.
     this.pausedSince = this.isPresent ? now : null;
   }
 
   /// Pauses as of the last sample, for an absence noticed only now: the time since that sample never
-  /// counts. Paused time counts from now while the practitioner is here.
+  /// counts. In timed mode, paused time counts from now while the practitioner is here.
   pauseAtLastSample(now) {
     if (this.phase === "confirming") this.resumeOnCancel = false;
     if (this.phase === "running") {
@@ -301,8 +301,8 @@ export class SessionEngine {
   }
 
   /// The practitioner has left the practice or come back to it: the page lost or regained focus, or
-  /// was hidden or shown. Leaving pauses a running practice as of its last sample. A pause counts as
-  /// practice only while they are here.
+  /// was hidden or shown. Leaving pauses a running practice as of its last sample. In timed mode, a
+  /// pause counts as practice only while they are here.
   setPresent(present, now) {
     if (present === this.isPresent) return;
     if (present) {
@@ -371,7 +371,8 @@ export class SessionEngine {
   }
 
   #countPause(now) {
-    if (this.pausedSince == null) return;
+    // Freestyle already lets a step last indefinitely; pausing it stops all practice time.
+    if (!this.configuration.isTimed || this.pausedSince == null) return;
     this.#record(Math.max(0, now - this.pausedSince));
     this.pausedSince = Math.max(this.pausedSince, now);
   }

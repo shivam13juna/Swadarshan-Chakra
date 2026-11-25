@@ -736,9 +736,68 @@ final class SessionEngineTests {
         engine.nextStage(at: 4150)
         Check.equal(engine.phase, .complete)
         Check.equal(engine.completedCycles, 2)
-        // 4004 + 4 × 7 s in cycle 1, then 4 + 40 paused + 10 + 4 × 7 s in cycle 2; no card counts.
-        Check.equal(engine.activeSeconds, 4114)
-        Check.equal(engine.stepSeconds, [[4004, 7, 7, 7, 7], [54, 7, 7, 7, 7]])
+        // 4004 + 4 × 7 s in cycle 1, then 4 + 10 + 4 × 7 s in cycle 2; no pause or card counts.
+        Check.equal(engine.activeSeconds, 4074)
+        Check.equal(engine.stepSeconds, [[4004, 7, 7, 7, 7], [14, 7, 7, 7, 7]])
+    }
+
+    func testFreestylePausesNeverCountAsPractice() {
+        var engine = stageEngine()
+        engine.begin(try! SessionConfiguration(freestyleCycles: 1), at: 0)
+        engine.pause(at: 10)
+        Check.isFalse(engine.tick(at: 20))
+        Check.isFalse(engine.nextStage(at: 30))
+        engine.resume(at: 40)
+        Check.equal(engine.activeSeconds, 10)
+        Check.equal(engine.stepSeconds, [[10, 0, 0, 0, 0]])
+
+        engine.pause(at: 50)
+        engine.setPresent(false, at: 60)
+        Check.equal(engine.activeSeconds, 20)
+        engine.setPresent(true, at: 500)
+        engine.resume(at: 520)
+        Check.equal(engine.activeSeconds, 20)
+
+        // Leaving and returning never starts counting a freestyle pause.
+        engine.tick(at: 530)
+        engine.setPresent(false, at: 530.1)
+        engine.setPresent(true, at: 900)
+        engine.resume(at: 905)
+        Check.equal(engine.activeSeconds, 30)
+
+        engine.requestConfirmation(.restart, at: 910)
+        engine.cancelConfirmation(at: 950)
+        Check.equal(engine.phase, .running)
+        engine.tick(at: 960)
+        Check.equal(engine.activeSeconds, 45)
+        engine.pause(at: 970)
+        engine.requestConfirmation(.end, at: 980)
+        Check.equal(engine.activeSeconds, 55)
+        engine.cancelConfirmation(at: 1000)
+        Check.equal(engine.phase, .paused)
+        engine.resume(at: 1010)
+        Check.equal(engine.activeSeconds, 55)
+
+        // An unobserved gap pauses at the last sample; the pause after it is excluded too.
+        engine.tick(at: 1015)
+        engine.tick(at: 1100, maximumGap: 2.5)
+        Check.equal(engine.phase, .paused)
+        engine.resume(at: 1200)
+        Check.equal(engine.activeSeconds, 60)
+        for now in [1205.0, 1210, 1215, 1220, 1225] { engine.nextStage(at: now) }
+        Check.equal(engine.phase, .complete)
+        Check.equal(engine.activeSeconds, 85)
+        Check.equal(engine.stepSeconds, [[65, 5, 5, 5, 5]])
+        Check.equal(engine.stepSeconds.joined().reduce(0, +), engine.activeSeconds)
+
+        // Escape during the opening cards begins a paused step without counting that pause.
+        var cards = SessionEngine()
+        cards.begin(try! SessionConfiguration(freestyleCycles: 1), at: 0)
+        cards.pause(at: 1.5)
+        cards.resume(at: 100)
+        cards.tick(at: 105)
+        Check.equal(cards.activeSeconds, 5)
+        Check.equal(cards.stepSeconds, [[5, 0, 0, 0, 0]])
     }
 
     func testFreestylePreferencesKeepTheTimeLastEntered() {

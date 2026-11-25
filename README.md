@@ -85,7 +85,7 @@ Swadarshan Chakra lives in your **menu bar** as a small gold chakra. Click it to
 
 - **Time per step** gives every form the time you enter.<br>*1 minute per step → 5 minutes per cycle.*
 - **Total time** is the time you have for the whole practice, shared equally by every step.<br>*10 minutes for 3 cycles → 40 seconds per step.*
-- **Freestyle** has no timer at all. Stay with each form as long as you like, and press <kbd>Space</kbd> for the next.
+- **Freestyle** has no countdown. Stay with each form as long as you like, and press <kbd>Space</kbd> for the next. <kbd>Esc</kbd> pauses practice-time tracking until you resume.
 
 With a timer, **Show countdown bar** puts a thin bar along the bottom of each step to show how much of its time is left. Untick it if you'd rather not see it.
 
@@ -102,7 +102,7 @@ Each step fills your screen, as in [the five steps](#the-five-steps) above.
 - The current **cycle** and **step** are in the top-left corner. The form's name and the time remaining are at the bottom.
 - A thin white bar along the bottom edge shows how much of the step's time is left, unless you've turned it off. It is full as the step begins, empties as the time runs out, and holds still while paused.
 - When a step's time is up, the next one begins by itself, after [a short card](#3-before-each-step) showing where it stands in the cycle of ages. Ready sooner? Press <kbd>Space</kbd>. In freestyle there is no countdown and no bar: each step waits for your <kbd>Space</kbd>.
-- <kbd>Esc</kbd> pauses, and <kbd>Esc</kbd> again carries on, so you can stay longer with a step: its time waits while you're paused. From the pause you can also restart or end the practice. The pause screen shows the keys for all three.
+- <kbd>Esc</kbd> pauses, and <kbd>Esc</kbd> again carries on. In timed modes the countdown waits, but time paused with the step still counts as practice, so you can give it longer. In freestyle, paused time never counts. From the pause you can also restart or end the practice. The pause screen shows the keys for all three.
 - The **×** in the top-right corner (or <kbd>⌘</kbd> <kbd>W</kbd>) ends the practice and closes the window. The chakra in the menu bar opens the setup screen again.
 - If you switch to another app or your Mac goes to sleep, the practice pauses and waits for you. Nothing moves on while you're away.
 
@@ -126,13 +126,13 @@ After three seconds the step begins on its own. Press <kbd>Space</kbd> to begin 
 
 ![The card that opens the second cycle: the gold chakra above the words "Cycle 2"](docs/screenshots/cycle-card.jpg)
 
-Each cycle opens with a short card: *Cycle 1*, *Cycle 2*, and so on. After three seconds it gives way to step 1's card, and then the first step begins. Neither card is counted as practice time, and every step still gets its full time. <kbd>Space</kbd> on either card begins the step at once.
+Each cycle opens with a short card: the gold chakra turning in the same soft golden aura as the menu screen, above *Cycle 1*, *Cycle 2*, and so on. After three seconds it gives way to step 1's card, and then the first step begins. Neither card is counted as practice time, and every step still gets its full time. <kbd>Space</kbd> on either card begins the step at once.
 
 ### 5. Finish
 
 ![The completion screen: your journey on the left, with this practice in it; on the right, the time practiced and planned, and a table of each cycle's time in each step, its total, and its average per step](docs/screenshots/complete.jpg)
 
-When the last cycle ends, the panel on the right shows how many cycles you completed and how long you actually practiced. That includes the time you spent paused with a step in front of you. Time away doesn't count: in another app, or with your Mac asleep or locked.
+When the last cycle ends, the panel on the right shows how many cycles you completed and how long you actually practiced. In timed modes, that includes time paused with a step in front of you. Freestyle counts only time spent running; pauses are excluded from both the total and each step's time. Time away doesn't count in either mode: in another app, or with your Mac asleep or locked.
 
 Below that, **Your time** shows how you spent it. Each cycle has a row with the time you gave each of the five steps, then **Average per step** and **Total this cycle**. With more than one cycle, a last row adds them all up. A long practice scrolls; the column titles and that last row stay in view.
 

@@ -93,6 +93,7 @@ enum CoreCheckRunner {
             ("Total time preferences", suite.testTotalTimePreferencesRoundTripAndFallBack),
             ("Freestyle has no timer", suite.testFreestyleHasNoTimer),
             ("Freestyle steps", suite.testFreestyleStepsLastUntilThePractitionerMovesOn),
+            ("Freestyle pauses never count", suite.testFreestylePausesNeverCountAsPractice),
             ("Freestyle preferences", suite.testFreestylePreferencesKeepTheTimeLastEntered),
             ("History: calendar days", history.testCalendarDays),
             ("History: practice times", history.testPracticeTimes),

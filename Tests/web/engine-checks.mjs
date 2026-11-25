@@ -410,8 +410,64 @@ check("a freestyle step lasts until the practitioner moves on", () => {
   }
   engine.nextStage(4150);
   equal(engine.phase, "complete", "complete");
-  equal(engine.activeSeconds, 4114, "practiced, with the pause; no card counted");
-  equal(JSON.stringify(engine.stepSeconds), "[[4004,7,7,7,7],[54,7,7,7,7]]", "step by step");
+  equal(engine.activeSeconds, 4074, "practiced; no pause or card counted");
+  equal(JSON.stringify(engine.stepSeconds), "[[4004,7,7,7,7],[14,7,7,7,7]]", "step by step");
+});
+
+check("freestyle pauses never count as practice", () => {
+  const engine = stageEngine();
+  engine.begin(Config.freestyle(1), 0);
+  engine.pause(10);
+  equal(engine.tick(20), false, "paused timer stays stopped");
+  equal(engine.nextStage(30), false, "Space does not advance a pause");
+  engine.resume(40);
+  equal(engine.activeSeconds, 10, "manual pause excluded");
+  equal(JSON.stringify(engine.stepSeconds), "[[10,0,0,0,0]]", "step excludes pause too");
+
+  engine.pause(50);
+  engine.setPresent(false, 60);
+  equal(engine.activeSeconds, 20, "pause before leaving excluded");
+  engine.setPresent(true, 500);
+  engine.resume(520);
+  equal(engine.activeSeconds, 20, "absence and pause after returning excluded");
+
+  engine.tick(530);
+  engine.setPresent(false, 530.1);
+  engine.setPresent(true, 900);
+  engine.resume(905);
+  equal(engine.activeSeconds, 30, "automatically paused time excluded");
+
+  engine.requestConfirmation("restart", 910);
+  engine.cancelConfirmation(950);
+  equal(engine.phase, "running", "running confirmation cancelled");
+  engine.tick(960);
+  equal(engine.activeSeconds, 45, "confirmation excluded");
+  engine.pause(970);
+  engine.requestConfirmation("end", 980);
+  equal(engine.activeSeconds, 55, "pause before confirmation excluded");
+  engine.cancelConfirmation(1000);
+  equal(engine.phase, "paused", "paused confirmation cancelled");
+  engine.resume(1010);
+  equal(engine.activeSeconds, 55, "pause after confirmation excluded");
+
+  engine.tick(1015);
+  engine.tick(1100, 2.5);
+  equal(engine.phase, "paused", "unobserved gap pauses");
+  engine.resume(1200);
+  equal(engine.activeSeconds, 60, "gap and following pause excluded");
+  for (const time of [1205, 1210, 1215, 1220, 1225]) engine.nextStage(time);
+  equal(engine.phase, "complete", "completed after resuming");
+  equal(engine.activeSeconds, 85, "only running time practiced");
+  equal(JSON.stringify(engine.stepSeconds), "[[65,5,5,5,5]]", "each step excludes pauses");
+  equal(engine.stepSeconds.flat().reduce((sum, seconds) => sum + seconds, 0), engine.activeSeconds, "steps add to total");
+
+  const cards = new SessionEngine();
+  cards.begin(Config.freestyle(1), 0);
+  cards.pause(1.5);
+  cards.resume(100);
+  cards.tick(105);
+  equal(cards.activeSeconds, 5, "pause on opening cards excluded");
+  equal(JSON.stringify(cards.stepSeconds), "[[5,0,0,0,0]]", "first step excludes opening pause");
 });
 
 check("freestyle keeps the time last entered", () => {

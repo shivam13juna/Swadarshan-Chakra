@@ -19,8 +19,8 @@ public struct SessionEngine: Sendable {
     public private(set) var completedCycles = 0
     public private(set) var remainingSeconds: TimeInterval = 60
     public private(set) var introductionRemaining: TimeInterval = 0
-    /// The time practiced: every running step, and every pause spent with the practice (`isPresent`).
-    /// Cards, confirmations, and time away never count.
+    /// The time practiced: every running step, plus pauses spent with a timed practice (`isPresent`).
+    /// Freestyle pauses, cards, confirmations, and time away never count.
     public private(set) var activeSeconds: TimeInterval = 0
     /// The same time, step by step: `stepSeconds[cycle][step]`, for every cycle begun so far.
     public private(set) var stepSeconds: [[TimeInterval]] = []
@@ -136,12 +136,12 @@ public struct SessionEngine: Sendable {
             accrue(until: now)
         }
         phase = .paused
-        // Time paused with a step is practice too, while the practitioner is here.
+        // In timed mode, time paused with a step is practice too, while the practitioner is here.
         pausedSince = isPresent ? now : nil
     }
 
     /// Pauses as of the last sample, for an absence noticed only now: the time since that sample never
-    /// counts. Paused time counts from now while the practitioner is here.
+    /// counts. In timed mode, paused time counts from now while the practitioner is here.
     public mutating func pauseAtLastSample(at now: TimeInterval) {
         if phase == .confirming { resumeOnCancel = false }
         if phase == .running {
@@ -153,7 +153,7 @@ public struct SessionEngine: Sendable {
 
     /// The practitioner has left the practice or come back to it: its window left the front or came
     /// back, or the Mac slept or woke, locked or unlocked. Leaving pauses a running practice as of its
-    /// last sample. A pause counts as practice only while they are here.
+    /// last sample. In timed mode, a pause counts as practice only while they are here.
     public mutating func setPresent(_ present: Bool, at now: TimeInterval) {
         guard present != isPresent else { return }
         if present {
@@ -227,7 +227,8 @@ public struct SessionEngine: Sendable {
     }
 
     private mutating func countPause(until now: TimeInterval) {
-        guard let since = pausedSince else { return }
+        // Freestyle already lets a step last indefinitely; pausing it stops all practice time.
+        guard configuration.isTimed, let since = pausedSince else { return }
         record(max(0, now - since))
         pausedSince = max(since, now)
     }

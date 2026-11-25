@@ -161,7 +161,7 @@ final class SessionModel: NSObject, ObservableObject {
     }
 
     /// Whether the practitioner is with the practice: the window is in front, and the Mac is awake and
-    /// unlocked. Leaving pauses a running practice, and a pause counts as practice only while they're here.
+    /// unlocked. Leaving pauses a running practice; only timed modes count pauses while they're here.
     func setPresent(_ present: Bool) {
         let wasActive = engine.phase == .running || engine.phase == .confirming
         engine.setPresent(present, at: Self.now)

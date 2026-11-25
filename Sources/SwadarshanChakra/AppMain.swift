@@ -443,7 +443,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     /// The practitioner is with the practice while its window is in front and the Mac is awake and
-    /// unlocked. Leaving pauses a running practice; a pause counts as practice only while they're here.
+    /// unlocked. Leaving pauses a running practice; only timed modes count pauses while they're here.
     private func updatePresence() {
         model?.setPresent(wantsMeditationVisible && NSApp.isActive && window?.isKeyWindow == true && absences.isEmpty)
     }

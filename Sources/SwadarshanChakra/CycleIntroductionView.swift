@@ -15,15 +15,16 @@ struct CycleIntroductionView: View {
             let size = geometry.size
             let compact = size.width < 1100 || size.height < 720
             let padding: CGFloat = compact ? 24 : 38
+            let chakraSize: CGFloat = (compact ? 92 : 120) * 1.3
             ZStack {
                 MeditationBackground()
 
                 VStack(spacing: compact ? 22 : 30) {
                     BrandMark(image: icon)
-                        .frame(width: compact ? 92 : 120, height: compact ? 92 : 120)
+                        .frame(width: chakraSize, height: chakraSize)
                         // The chakra turns one fifth, one form, while the card is shown.
                         .rotationEffect(.degrees(turned ? 72 : 0))
-                        .shadow(color: Palette.gold.opacity(0.22), radius: 36)
+                        .background { BrandHalo(size: chakraSize) }
                     Text("Cycle \(model.engine.currentCycle)")
                         .font(.system(size: compact ? 46 : 60, weight: .regular, design: .serif))
                         .foregroundColor(Palette.ivory)

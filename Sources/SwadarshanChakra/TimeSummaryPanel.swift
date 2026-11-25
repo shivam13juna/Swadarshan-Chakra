@@ -61,7 +61,7 @@ struct TimeSummaryPanel: View {
     }
 
     /// Complete: the cycles done, the time practiced against the time planned, and the way on.
-    /// Practiced includes time paused with a step; freestyle planned no time to compare it with.
+    /// Timed practice includes pauses with a step; freestyle excludes pauses and has no planned time.
     private func completion(_ engine: SessionEngine) -> some View {
         VStack(alignment: .leading, spacing: compact ? 14 : 18) {
             HStack(alignment: .center, spacing: compact ? 12 : 14) {
