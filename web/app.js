@@ -897,9 +897,9 @@ function renderJourney() {
   setTile("today", HistoryText.minutes(insights.todayTotals.seconds), insights.todayDetail);
   setTile("week", HistoryText.minutes(insights.last7), insights.weekComparison.text, insights.weekComparison.direction);
   setTile("month", HistoryText.minutes(insights.last30), insights.monthComparison.text, insights.monthComparison.direction);
-  setTile("average", insights.averageSessionSeconds == null ? "—" : HistoryText.minutes(insights.averageSessionSeconds),
-    "Per session · last 7 days");
-  byId("average-session").title = `Total practice time divided by all ${insights.last7Practices} saved sessions in the last 7 days, including today`;
+  setTile("average", insights.averageCycleSeconds == null ? "—" : TimeText.duration(insights.averageCycleSeconds),
+    "Per cycle · last 7 days");
+  byId("average-cycle").title = `Total practice time divided by all ${insights.last7Cycles} completed cycles in the last 7 days, including today`;
   setText(byId("history-streak"), `Current streak: ${insights.streakValue} · Best: ${HistoryText.count(insights.bestStreak, "day")}`);
   renderCalendar();
   renderSessions();

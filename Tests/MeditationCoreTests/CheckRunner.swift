@@ -101,7 +101,7 @@ enum CoreCheckRunner {
             ("History: insights from the shared backup", history.testInsightsFromTheSharedBackup),
             ("History: an empty history", history.testAnEmptyHistory),
             ("History: trends and streaks", history.testTrendsAndStreaks),
-            ("History: weekly session average", history.testWeeklySessionAverage),
+            ("History: weekly cycle average", history.testWeeklyCycleAverage),
             ("History: manually added practices", history.testManuallyAddedPractices),
             ("History: merging another device's practices", history.testMergingAnotherDevicesPractices),
             ("History: writing and reading a backup", history.testWritingAndReadingABackup),

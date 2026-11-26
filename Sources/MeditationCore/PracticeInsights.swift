@@ -57,7 +57,7 @@ public struct PracticeInsights: Equatable, Sendable {
     public let activeDays: Int
     public let todayTotals: Totals
     public let last7: Int
-    public let last7Practices: Int
+    public let last7Cycles: Int
     public let previous7: Int
     public let last30: Int
     public let previous30: Int
@@ -117,7 +117,7 @@ public struct PracticeInsights: Equatable, Sendable {
 
         func span(_ from: Int, _ to: Int) -> Int { (from...to).reduce(0) { $0 + (days[$1]?.seconds ?? 0) } }
         last7 = span(today - 6, today)
-        last7Practices = (today - 6...today).reduce(0) { $0 + (days[$1]?.practices ?? 0) }
+        last7Cycles = (today - 6...today).reduce(0) { $0 + (days[$1]?.cycles ?? 0) }
         previous7 = span(today - 13, today - 7)
         last30 = span(today - 29, today)
         previous30 = span(today - 59, today - 30)
@@ -223,11 +223,11 @@ public struct PracticeInsights: Equatable, Sendable {
         return currentStreak >= bestStreak ? "Your longest yet" : "Best: \(HistoryText.count(bestStreak, "day"))"
     }
 
-    /// Every saved session begun today or in the six preceding calendar days has equal weight,
-    /// including freestyle and sessions ended early. No sessions means no average.
-    public var averageSessionSeconds: Int? {
-        guard last7Practices > 0 else { return nil }
-        return Int((Double(last7) / Double(last7Practices)).rounded())
+    /// Total practice time divided by completed cycles in practices begun today or in the six
+    /// preceding calendar days. Includes manual and ended-early practices; no cycles means no average.
+    public var averageCycleSeconds: Int? {
+        guard last7Cycles > 0 else { return nil }
+        return Int((Double(last7) / Double(last7Cycles)).rounded())
     }
 
     public var trendTitle: String {

@@ -98,8 +98,8 @@ struct PracticeHistoryTests {
         Check.equal(insights.weekComparison, .init(direction: .up, text: "Up 51% on the 7 days before"))
         Check.equal(insights.monthComparison, .init(direction: .up, text: "Up 103% on the 30 days before"))
         Check.equal([insights.streakValue, insights.streakDetail], ["4 days", "Best: 6 days"])
-        Check.equal(insights.last7Practices, 6)
-        Check.equal(insights.averageSessionSeconds, 905)
+        Check.equal(insights.last7Cycles, 17)
+        Check.equal(insights.averageCycleSeconds, 319)
         Check.equal([insights.trendTitle, insights.trendDetail],
                     ["Rising", "2 hr 58 min in the last four weeks, up 87% on the four before."])
         Check.equal(insights.rhythmNotes, [
@@ -118,8 +118,8 @@ struct PracticeHistoryTests {
         Check.equal(insights.trendTitle, "Resting")
         Check.equal(insights.weekTotals, Array(repeating: 0, count: 12))
         Check.equal([insights.todayDetail, insights.streakDetail], ["Not yet today", "Practice on days in a row"])
-        Check.equal(insights.last7Practices, 0)
-        Check.isNil(insights.averageSessionSeconds)
+        Check.equal(insights.last7Cycles, 0)
+        Check.isNil(insights.averageCycleSeconds)
         Check.equal(insights.weekComparison, .init(direction: .none, text: "None in the 7 days before either"))
         Check.equal(insights.rhythmNotes, ["Practice a few more times, and the hours you favor will show here."])
         Check.equal([insights.level(forDay: today), insights.heatLevel(weekday: 3, hour: 6)], [0, 0])
@@ -146,27 +146,31 @@ struct PracticeHistoryTests {
         Check.equal(lapsed.currentStreak, 0)
     }
 
-    func testWeeklySessionAverage() {
+    func testWeeklyCycleAverage() {
         let freestyle = PracticeRecord(id: "freestyle", start: time("2026-11-18T20:00:00+05:30"),
-                                       seconds: 1800, cycles: 1, planned: 1, timing: .freestyle, steps: nil, device: "web")!
+                                       seconds: 1800, cycles: 6, planned: 6, timing: .freestyle, steps: nil, device: "web")!
         let history = PracticeHistory([
-            dayRecord(0, 600), freestyle, dayRecord(6, 3000), // three sessions on two days
+            record("today", "2026-11-18T07:00:00+05:30", 600, cycles: 3), freestyle, dayRecord(6, 3000),
             dayRecord(7, 9000), dayRecord(-1, 9000) // just outside either boundary
         ])
         let insights = PracticeInsights(history, today: today, firstWeekday: monday)
-        Check.equal(insights.last7Practices, 3)
+        Check.equal(insights.last7Cycles, 10)
         Check.equal(insights.last7, 5400)
-        Check.equal(insights.averageSessionSeconds, 1800)
+        Check.equal(insights.averageCycleSeconds, 540)
+        // Six cycles and three cycles contribute nine cycles, not two equally weighted sessions.
+        let differentLengths = PracticeInsights(PracticeHistory([history.records.first { $0.id == "today" }!, freestyle]), today: today, firstWeekday: monday)
+        Check.equal(differentLengths.averageCycleSeconds, 267)
         let endedEarly = record("partial", "2026-11-17T06:00:00+05:30", 600, cycles: 0, planned: 3)
         let withPartial = PracticeInsights(PracticeHistory(history.records + [endedEarly]), today: today, firstWeekday: 0)
-        Check.equal(withPartial.last7Practices, 4)
-        Check.equal(withPartial.averageSessionSeconds, 1500)
+        Check.equal(withPartial.last7Cycles, 10)
+        Check.equal(withPartial.averageCycleSeconds, 600)
+        Check.isNil(PracticeInsights(PracticeHistory([endedEarly]), today: today, firstWeekday: monday).averageCycleSeconds)
         let old = PracticeInsights(PracticeHistory([dayRecord(7, 600)]), today: today, firstWeekday: monday)
-        Check.isNil(old.averageSessionSeconds)
+        Check.isNil(old.averageCycleSeconds)
         let zero = PracticeInsights(PracticeHistory([dayRecord(0, 0)]), today: today, firstWeekday: monday)
-        Check.equal(zero.averageSessionSeconds, 0)
+        Check.equal(zero.averageCycleSeconds, 0)
         let rounded = PracticeInsights(PracticeHistory([dayRecord(0, 60), dayRecord(1, 61)]), today: today, firstWeekday: monday)
-        Check.equal(rounded.averageSessionSeconds, 61)
+        Check.equal(rounded.averageCycleSeconds, 61)
     }
 
     func testMergingAnotherDevicesPractices() throws {
@@ -209,8 +213,8 @@ struct PracticeHistoryTests {
         Check.isNil(regular.averageSecondsPerStep)
         Check.isTrue(!regular.json.contains("manual"))
         let insights = PracticeInsights(PracticeHistory(history.records + [regular]), today: today, firstWeekday: monday)
-        Check.equal(insights.last7Practices, 2)
-        Check.equal(insights.averageSessionSeconds, 900)
+        Check.equal(insights.last7Cycles, 4)
+        Check.equal(insights.averageCycleSeconds, 450)
         Check.equal(insights.todayTotals.cycles, 4)
         Check.equal(try PracticeHistory.read(history.document()).history, history)
         var merged = history

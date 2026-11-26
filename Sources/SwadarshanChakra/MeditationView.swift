@@ -5,6 +5,7 @@ struct MeditationView: View {
     @ObservedObject var model: SessionModel
     let artwork: ArtworkLibrary
     var topInset: CGFloat = 0
+    @State private var addedPractice: PracticeRecord?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -35,6 +36,12 @@ struct MeditationView: View {
         .preferredColorScheme(.dark)
         .foregroundColor(Palette.ivory)
         .ignoresSafeArea()
+        .sheet(isPresented: $model.addingPractice) {
+            ManualPracticeView(model: model) { record in
+                addedPractice = record
+                model.showJourney()
+            }
+        }
     }
 
     private static let journeyAnchor = "journey"
@@ -83,7 +90,8 @@ struct MeditationView: View {
                             practiceFooter
                         }
                         .padding(.bottom, compact ? 24 : 32)
-                        JourneyView(model: model, width: min(width - historyPadding * 2, 1424), compact: compact)
+                        JourneyView(model: model, width: min(width - historyPadding * 2, 1424), compact: compact,
+                                    addedPractice: addedPractice)
                             .padding(.horizontal, historyPadding)
                             .padding(.vertical, compact ? 24 : 28)
                             .frame(maxWidth: .infinity, minHeight: scroll.size.height, alignment: .top)

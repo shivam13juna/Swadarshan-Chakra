@@ -399,7 +399,7 @@ export class PracticeInsights {
       return sum;
     };
     this.last7 = span(today - 6, today);
-    this.last7Practices = Array.from({ length: 7 }, (_, offset) => days.get(today - offset)?.practices ?? 0)
+    this.last7Cycles = Array.from({ length: 7 }, (_, offset) => days.get(today - offset)?.cycles ?? 0)
       .reduce((sum, count) => sum + count, 0);
     this.previous7 = span(today - 13, today - 7);
     this.last30 = span(today - 29, today);
@@ -507,10 +507,10 @@ export class PracticeInsights {
     return this.currentStreak >= this.bestStreak ? "Your longest yet" : `Best: ${HistoryText.count(this.bestStreak, "day")}`;
   }
 
-  /// Every saved session begun today or in the six preceding calendar days has equal weight,
-  /// including freestyle and sessions ended early. No sessions means no average.
-  get averageSessionSeconds() {
-    return this.last7Practices > 0 ? Math.round(this.last7 / this.last7Practices) : null;
+  /// Total practice time divided by completed cycles in practices begun today or in the six
+  /// preceding calendar days. Includes manual and ended-early practices; no cycles means no average.
+  get averageCycleSeconds() {
+    return this.last7Cycles > 0 ? Math.round(this.last7 / this.last7Cycles) : null;
   }
 
   get trendTitle() {

@@ -28,20 +28,29 @@ struct SetupPanel: View {
     let compact: Bool
 
     var body: some View {
-        // Compact spacing leaves room for the countdown-bar setting in the smallest window, 1024 × 640.
-        VStack(alignment: .leading, spacing: compact ? 14 : 24) {
-            VStack(alignment: .leading, spacing: compact ? 9 : 12) {
+        // Keep both ways of recording practice visible, including in the smallest window, 1024 × 640.
+        VStack(alignment: .leading, spacing: compact ? 8 : 18) {
+            VStack(alignment: .leading, spacing: compact ? 6 : 10) {
                 Eyebrow(text: "YOUR PRACTICE")
                 Text("Your quiet moment.")
-                    .font(.system(size: compact ? 28 : 35, weight: .regular, design: .serif))
+                    .font(.system(size: compact ? 26 : 35, weight: .regular, design: .serif))
                     .foregroundColor(Palette.ivory).fixedSize(horizontal: false, vertical: true)
                 Text("Five forms. One complete cycle.")
                     .font(.system(size: 13)).foregroundColor(Palette.muted)
+                Button { model.addingPractice = true } label: {
+                    Text("Add spinned cycles manually")
+                        .font(.system(size: compact ? 13 : 14, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(GoldButtonStyle())
+                .help("Record completed cycles and time practiced elsewhere")
+                .accessibilityIdentifier("add-practice")
+                .padding(.top, 4)
             }
 
             Rectangle().fill(Palette.gold.opacity(0.17)).frame(height: 1)
 
-            VStack(spacing: compact ? 16 : 22) {
+            VStack(spacing: compact ? 14 : 22) {
                 NumberInput(title: "Cycles", hint: "1–108 rounds", value: $model.cyclesText,
                             range: SessionConfiguration.cycleRange, fallback: 1, valid: model.cyclesValid,
                             error: "Enter a whole number from 1 to 108.", identifier: "cycles-input")
@@ -49,7 +58,7 @@ struct SetupPanel: View {
             }
 
             summary
-                .padding(14)
+                .padding(compact ? 8 : 14)
                 .background(Palette.background.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
 
             VStack(spacing: 12) {
@@ -71,7 +80,7 @@ struct SetupPanel: View {
                     .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(compact ? 22 : 28)
+        .padding(compact ? 18 : 24)
         .background {
             RoundedRectangle(cornerRadius: 17)
                 .fill(LinearGradient(colors: [Palette.panel.opacity(0.85), Palette.panel.opacity(0.45)],

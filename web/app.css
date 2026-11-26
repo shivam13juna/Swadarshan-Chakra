@@ -721,15 +721,15 @@ button { cursor: pointer; }
   flex: none;
   flex-direction: column;
   align-self: center;
-  gap: 24px;
+  gap: 18px;
   width: 326px;
-  padding: 28px;
+  padding: 24px;
   border: 0.7px solid rgba(217, 184, 117, 0.17);
   border-radius: 17px;
   background: linear-gradient(to bottom right, rgba(16, 20, 31, 0.85), rgba(16, 20, 31, 0.45));
 }
 
-.setup-intro { display: flex; flex-direction: column; gap: 12px; }
+.setup-intro { display: flex; flex-direction: column; gap: 10px; }
 
 .setup-title {
   font-family: var(--serif);
@@ -918,6 +918,7 @@ button { cursor: pointer; }
 .begin-button span { flex: 1; }
 .begin-button .icon-play { width: 10px; height: 10px; }
 .begin-button .icon-return { width: 13px; height: 13px; opacity: 0.55; }
+.manual-practice-button { width: 100%; margin-top: 4px; }
 
 .setup-note {
   padding: 0 1px;
@@ -936,10 +937,12 @@ button { cursor: pointer; }
   .overview-body { gap: 22px; }
   .practice-section { min-height: max(563px, calc(100% - 91px)); gap: 14px; padding-bottom: 24px; }
   /* Tighter spacing leaves room for the countdown-bar setting at 1024 × 640. */
-  .setup-panel { gap: 14px; width: 286px; padding: 22px; }
-  .setup-intro { gap: 9px; }
+  .setup-panel { gap: 8px; width: 286px; padding: 18px; }
+  .setup-intro { gap: 6px; }
+  .setup-panel .setup-title { font-size: 26px; }
   .setup-title { font-size: 28px; }
-  .setup-fields { gap: 16px; }
+  .setup-fields { gap: 14px; }
+  .setup-panel .summary { padding: 8px; }
   .summary-panel { gap: 12px; padding: 22px; }
   .completion { gap: 14px; }
   .completion-head { gap: 12px; }
@@ -1300,8 +1303,6 @@ button { cursor: pointer; }
 .journey-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px 20px; }
 .journey-intro { display: flex; flex-direction: column; gap: 10px; }
 .journey-intro .setup-title:focus { outline: none; }
-.history-actions { display: flex; align-items: center; gap: 12px; flex: none; }
-.history-actions > button { white-space: nowrap; gap: 5px; }
 .backup { flex: none; }
 .backup-menu { position: relative; }
 .backup-menu > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; }
@@ -1346,7 +1347,7 @@ button { cursor: pointer; }
   font-weight: 500;
   letter-spacing: 1.4px;
   text-transform: uppercase;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .tile .value {
@@ -1361,6 +1362,7 @@ button { cursor: pointer; }
 }
 
 .tile .detail { display: flex; align-items: baseline; gap: 4px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+#average-cycle .value { white-space: normal; }
 .tile .detail.is-up { color: var(--gold); }
 .tile .detail .icon { position: relative; top: 1px; width: 9px; height: 9px; stroke-width: 2.4; }
 
@@ -1632,7 +1634,7 @@ button { cursor: pointer; }
   .day { height: 50px; }
   .day-cycles { bottom: 18px; }
   .journey-top { flex-wrap: wrap; }
-  .history-actions { width: 100%; justify-content: space-between; }
+  .backup { margin-left: auto; }
   .session > summary { gap: 8px; }
 }
 

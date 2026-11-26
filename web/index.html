@@ -74,6 +74,7 @@
               <p class="eyebrow">Your practice</p>
               <h2 class="setup-title">Your quiet moment.</h2>
               <p class="setup-subtitle">Five forms. One complete cycle.</p>
+              <button id="add-practice" type="button" class="gold-button manual-practice-button" data-action="add-practice" title="Record completed cycles and time practiced elsewhere">Add spinned cycles manually</button>
             </div>
             <div class="setup-rule" aria-hidden="true"></div>
             <div class="setup-fields">
@@ -211,10 +212,6 @@
             <div class="journey-intro">
               <h2 id="journey-title" class="setup-title" tabindex="-1">Your practice history</h2>
             </div>
-            <div class="history-actions">
-              <button id="add-practice" type="button" class="quiet-button" data-action="add-practice" title="Record completed cycles and time practiced elsewhere">
-                <span aria-hidden="true">＋</span> Add practice
-              </button>
             <div class="backup">
               <details id="backup-menu" class="backup-menu">
                 <summary class="quiet-button">Backups<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6.5l4 4 4-4"/></svg></summary>
@@ -229,7 +226,6 @@
               </details>
               <input id="import-file" type="file" accept=".json,application/json" hidden>
             </div>
-            </div>
           </div>
           <p id="journey-subtitle" class="setup-subtitle"></p>
           <p id="backup-message" class="backup-message" role="status" hidden></p>
@@ -237,7 +233,7 @@
           <div id="journey-empty" class="journey-card journey-empty" hidden>
             <svg class="empty-icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="8" width="30" height="27" rx="4"/><path d="M5 15.5h30M13 4.5v7M27 4.5v7"/><circle cx="28.5" cy="28.5" r="5.5"/><path d="M28.5 26v2.7l1.8 1.2"/></svg>
             <h3 class="empty-title">Your journey begins with your first practice.</h3>
-            <p class="empty-note">A minute of practice or a complete cycle is saved here. Practiced elsewhere? Choose Add practice. To bring practices from another device, choose Backups → Import backup.</p>
+            <p class="empty-note">A minute of practice or a complete cycle is saved here. To bring practices from another device, choose Backups → Import backup.</p>
           </div>
 
           <div id="journey-content" class="journey-content">
@@ -245,7 +241,7 @@
               <div class="journey-card tile"><p class="label">Today</p><p id="tile-today" class="value"></p><p id="tile-today-detail" class="detail"></p></div>
               <div class="journey-card tile"><p class="label">Last 7 days</p><p id="tile-week" class="value"></p><p id="tile-week-detail" class="detail"></p></div>
               <div class="journey-card tile"><p class="label">Last 30 days</p><p id="tile-month" class="value"></p><p id="tile-month-detail" class="detail"></p></div>
-              <div id="average-session" class="journey-card tile"><p class="label">Average session</p><p id="tile-average" class="value"></p><p id="tile-average-detail" class="detail"></p></div>
+              <div id="average-cycle" class="journey-card tile"><p class="label">Average per cycle</p><p id="tile-average" class="value"></p><p id="tile-average-detail" class="detail"></p></div>
             </div>
 
             <div class="journey-grid">

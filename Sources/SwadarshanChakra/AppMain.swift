@@ -618,17 +618,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     "A file that isn't a backup changes nothing")
 
         let previousWeek = probe.insights.last7
-        let previousCount = probe.insights.last7Practices
+        let previousCount = probe.insights.last7Cycles
         let manual = try probe.addPractice(start: probe.currentDate.addingTimeInterval(-10), cycles: 3, seconds: 600)
         try require(manual.manual && manual.steps == nil && manual.averageSecondsPerStep == 40,
                     "Practice elsewhere records completed cycles and their average, without inventing form times")
         try require(probe.engine.phase == .ready && onDisk() == probe.history.records
                     && PracticeStore.file(at: file).initial.records.contains(manual),
                     "A manual practice persists and reloads without starting the timer")
-        try require(probe.insights.last7 == previousWeek + 600 && probe.insights.last7Practices == previousCount + 1,
-                    "Manual practice contributes once to the weekly session average")
+        try require(probe.insights.last7 == previousWeek + 600 && probe.insights.last7Cycles == previousCount + 3,
+                    "Manual practice contributes its completed cycles to the weekly cycle average")
         let old = try probe.addPractice(start: probe.currentDate.addingTimeInterval(-10 * 86_400), cycles: 2, seconds: 900)
-        try require(probe.history.records(on: old.day).contains(old) && probe.insights.last7Practices == previousCount + 1,
+        try require(probe.history.records(on: old.day).contains(old) && probe.insights.last7Cycles == previousCount + 3,
                     "Backdated practice belongs to its own day and stays outside this week's average")
         try PracticeHistory([manual, old]).document().write(to: backup)
         probe.importHistory(from: backup)

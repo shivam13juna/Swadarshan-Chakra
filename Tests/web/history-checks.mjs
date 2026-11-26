@@ -111,7 +111,7 @@ check("insights from the shared backup", () => {
   equal(insights.weekComparison, { direction: "up", text: "Up 51% on the 7 days before" }, "the week");
   equal(insights.monthComparison, { direction: "up", text: "Up 103% on the 30 days before" }, "the month");
   equal([insights.streakValue, insights.streakDetail], ["4 days", "Best: 6 days"], "streak words");
-  equal([insights.last7Practices, insights.averageSessionSeconds], [6, 905], "weekly session average");
+  equal([insights.last7Cycles, insights.averageCycleSeconds], [17, 319], "weekly cycle average");
   equal([insights.trendTitle, insights.trendDetail],
     ["Rising", "2 hr 58 min in the last four weeks, up 87% on the four before."], "trend words");
   equal(insights.rhythmNotes, [
@@ -128,7 +128,7 @@ check("an empty history", () => {
   equal([insights.trend, insights.trendTitle], ["resting", "Resting"], "trend");
   equal(insights.weekTotals, Array(12).fill(0), "weeks");
   equal([insights.todayDetail, insights.streakDetail], ["Not yet today", "Practice on days in a row"], "words");
-  equal([insights.last7Practices, insights.averageSessionSeconds], [0, null], "no average without sessions");
+  equal([insights.last7Cycles, insights.averageCycleSeconds], [0, null], "no average without sessions");
   equal(insights.weekComparison, { direction: "none", text: "None in the 7 days before either" }, "the week");
   equal(insights.rhythmNotes, ["Practice a few more times, and the hours you favor will show here."], "rhythm");
   equal([insights.level(TODAY), insights.heatLevel(3, 6)], [0, 0], "levels");
@@ -153,25 +153,27 @@ check("trends and streaks", () => {
   equal(lapsed.currentStreak, 0, "a missed day ends the streak");
 });
 
-check("weekly session average", () => {
-  const today = record("today", "2026-11-18T07:00:00+05:30", 600);
+check("weekly cycle average", () => {
+  const today = record("today", "2026-11-18T07:00:00+05:30", 600, 3);
   const freestyle = makeRecord({ id: "freestyle", start: "2026-11-18T20:00:00+05:30", seconds: 1800,
-    cycles: 1, planned: 1, timing: "freestyle", device: "web" });
+    cycles: 6, planned: 6, timing: "freestyle", device: "web" });
   const history = new PracticeHistory([today, freestyle,
     record("six", "2026-11-12T07:00:00+05:30", 3000),
     record("seven", "2026-11-11T07:00:00+05:30", 9000),
     record("future", "2026-11-19T07:00:00+05:30", 9000)]);
   const insights = new PracticeInsights(history, TODAY, MONDAY);
-  equal([insights.last7Practices, insights.last7, insights.averageSessionSeconds], [3, 5400, 1800], "each session, not each day");
+  equal([insights.last7Cycles, insights.last7, insights.averageCycleSeconds], [10, 5400, 540], "all cycles across sessions");
+  equal(new PracticeInsights(new PracticeHistory([today, freestyle]), TODAY, MONDAY).averageCycleSeconds, 267, "six cycles and three cycles contribute nine, not two equally weighted sessions");
   const partial = record("partial", "2026-11-17T06:00:00+05:30", 600, 0, 3);
   const withPartial = new PracticeInsights(new PracticeHistory([...history.records, partial]), TODAY, 0);
-  equal([withPartial.last7Practices, withPartial.averageSessionSeconds], [4, 1500], "includes ended-early practices and ignores week start");
+  equal([withPartial.last7Cycles, withPartial.averageCycleSeconds], [10, 600], "includes all practice time but only completed cycles");
+  equal(new PracticeInsights(new PracticeHistory([partial]), TODAY, MONDAY).averageCycleSeconds, null, "no completed cycles means no average");
   equal(new PracticeInsights(new PracticeHistory([record("old", "2026-11-11T06:00:00+05:30", 600)]), TODAY, MONDAY)
-    .averageSessionSeconds, null, "no recent sessions");
+    .averageCycleSeconds, null, "no recent sessions");
   equal(new PracticeInsights(new PracticeHistory([record("zero", "2026-11-18T06:00:00+05:30", 0)]), TODAY, MONDAY)
-    .averageSessionSeconds, 0, "a saved zero-length cycle is distinct from no sessions");
+    .averageCycleSeconds, 0, "a saved zero-length cycle is distinct from no sessions");
   equal(new PracticeInsights(new PracticeHistory([record("a", "2026-11-18T06:00:00+05:30", 60),
-    record("b", "2026-11-17T06:00:00+05:30", 61)]), TODAY, MONDAY).averageSessionSeconds, 61, "rounds once to seconds");
+    record("b", "2026-11-17T06:00:00+05:30", 61)]), TODAY, MONDAY).averageCycleSeconds, 61, "rounds once to seconds");
 });
 
 check("manually added practices", () => {
@@ -189,7 +191,7 @@ check("manually added practices", () => {
   equal(averageSecondsPerStep(regular), null, "only manual entries use the aggregate calculation");
   equal(recordJSON(regular).includes("manual"), false, "legacy encoding unchanged");
   const insights = new PracticeInsights(new PracticeHistory([...history.records, regular]), TODAY, MONDAY);
-  equal([insights.last7Practices, insights.averageSessionSeconds, insights.todayTotals.cycles], [2, 900, 4], "manual entries contribute once within their own dates");
+  equal([insights.last7Cycles, insights.averageCycleSeconds, insights.todayTotals.cycles], [4, 450, 4], "manual cycles contribute within their own dates");
   equal(PracticeHistory.read(history.document()).history.records, history.records, "backup round trip");
   equal(history.merge(history.records), { added: 0, updated: 0, unchanged: 2 }, "reimport does not duplicate");
   for (const [seconds, cycles] of [[0,3], [-1,3], [86401,3], [600,0], [600,109], [2.5,3], [600,1.5]]) {

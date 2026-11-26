@@ -10,6 +10,7 @@ struct JourneyView: View {
     let width: CGFloat
     /// The window's compact sizes.
     let compact: Bool
+    var addedPractice: PracticeRecord? = nil
     @State private var month: CivilDate?
     @State private var selectedDay: Int?
     @State private var expandedPractice: String?
@@ -62,14 +63,13 @@ struct JourneyView: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Your practice history")
         .accessibilityIdentifier("journey")
-        .sheet(isPresented: $model.addingPractice) {
-            ManualPracticeView(model: model) { record in
-                month = CivilDate(dayNumber: record.day)
-                selectDay(record.day)
-                let records = Array(model.history.records(on: record.day).reversed())
-                visiblePractices = max(5, (records.firstIndex(where: { $0.id == record.id }) ?? 0) + 1)
-                expandedPractice = record.id
-            }
+        .onChange(of: addedPractice) { record in
+            guard let record else { return }
+            month = CivilDate(dayNumber: record.day)
+            selectDay(record.day)
+            let records = Array(model.history.records(on: record.day).reversed())
+            visiblePractices = max(5, (records.firstIndex(where: { $0.id == record.id }) ?? 0) + 1)
+            expandedPractice = record.id
         }
     }
 
@@ -84,13 +84,7 @@ struct JourneyView: View {
                     .foregroundColor(Palette.ivory)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
-                HStack(spacing: 16) {
-                    Button { model.addingPractice = true } label: { Label("Add practice", systemImage: "plus") }
-                        .buttonStyle(QuietButtonStyle()).fixedSize()
-                        .help("Record completed cycles and time practiced elsewhere")
-                        .accessibilityIdentifier("add-practice")
-                    backup
-                }
+                backup
             }
             Text(subtitle(insights)).font(.system(size: 13)).foregroundColor(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -136,7 +130,7 @@ struct JourneyView: View {
             Text("Your journey begins with your first practice.")
                 .font(.system(size: dense ? 22 : 26, weight: .regular, design: .serif)).foregroundColor(Palette.ivory)
                 .multilineTextAlignment(.center)
-            Text("A minute of practice or a complete cycle is saved here. Practiced elsewhere? Choose Add practice. To bring practices from another device, choose Backups → Import backup.")
+            Text("A minute of practice or a complete cycle is saved here. To bring practices from another device, choose Backups → Import backup.")
                 .font(.system(size: 13)).foregroundColor(Palette.muted).multilineTextAlignment(.center)
                 .lineSpacing(3).frame(maxWidth: 520).fixedSize(horizontal: false, vertical: true)
         }
@@ -155,11 +149,11 @@ struct JourneyView: View {
                             detail: insights.weekComparison.text, direction: insights.weekComparison.direction, compact: dense)
         let month = StatTile(title: "LAST 30 DAYS", value: HistoryText.minutes(insights.last30),
                              detail: insights.monthComparison.text, direction: insights.monthComparison.direction, compact: dense)
-        let average = StatTile(title: "AVERAGE SESSION", value: insights.averageSessionSeconds.map(HistoryText.minutes) ?? "—",
-                               detail: "Per session · last 7 days", direction: nil, compact: dense)
-            .help("Total practice time divided by all \(insights.last7Practices) saved sessions in the last 7 days, including today")
-            .accessibilityIdentifier("average-session")
-        // Four in a row, or two by two. Each session contributes once to the average.
+        let average = StatTile(title: "AVERAGE PER CYCLE", value: insights.averageCycleSeconds.map { TimeText.duration(Double($0)) } ?? "—",
+                               detail: "Per cycle · last 7 days", direction: nil, compact: dense)
+            .help("Total practice time divided by all \(insights.last7Cycles) completed cycles in the last 7 days, including today")
+            .accessibilityIdentifier("average-cycle")
+        // Four in a row, or two by two. Longer sessions contribute all their completed cycles.
         if width < 700 {
             VStack(spacing: 10) {
                 HStack(spacing: 10) { today; week }.fixedSize(horizontal: false, vertical: true)
