@@ -274,7 +274,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Closing: the practice ends (see SessionModel.close), then the window goes and the app stays in the menu bar.
     @objc private func closeMeditation() { model.close() }
 
-    /// The journey, in the meditation window: below setup, beside a finished practice. Not during a practice.
+    /// History follows setup and the finished practice in the same scroll. Not during a practice.
     @objc private func showJourney() {
         guard model.engine.phase == .ready || model.engine.phase == .complete else { return }
         showMeditation()
@@ -458,10 +458,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func handleKey(_ event: NSEvent) -> NSEvent? {
         guard let window, window.isKeyWindow else { return event }
-        return routeKey(event, textEditing: window.firstResponder is NSTextView)
+        return routeKey(event)
     }
 
-    private func routeKey(_ event: NSEvent, textEditing: Bool = false) -> NSEvent? {
+    private func routeKey(_ event: NSEvent) -> NSEvent? {
+        // The sheet owns Escape, Space and Return while adding a practice.
+        if model.addingPractice { return event }
         let modifiers = event.modifierFlags.intersection([.command, .control, .option])
         if event.keyCode == 53 && modifiers.isEmpty {
             if !event.isARepeat { model.escape() }
@@ -472,9 +474,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 model.nextStage(eventTime: event.timestamp, isRepeat: event.isARepeat)
                 return nil
             }
-            // Space in a setup text field is just input; elsewhere it must not activate a
-            // focused Resume/Restart/Begin button as an unexpected side effect.
-            if model.engine.phase == .ready && textEditing { return event }
+            // Outside practice, Space belongs to the focused control or the scroll view, including
+            // history's calendar, session disclosures, and backup menu. Paused practice still ignores it.
+            if model.engine.phase == .ready || model.engine.phase == .complete { return event }
             return nil
         }
         return event
@@ -614,6 +616,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         probe.importHistory(from: backup)
         try require(probe.history.records.count == 5 && probe.backupMessage == "“backup.json” isn't a Swadarshan Chakra backup.",
                     "A file that isn't a backup changes nothing")
+
+        let previousWeek = probe.insights.last7
+        let previousCount = probe.insights.last7Practices
+        let manual = try probe.addPractice(start: probe.currentDate.addingTimeInterval(-10), cycles: 3, seconds: 600)
+        try require(manual.manual && manual.steps == nil && manual.averageSecondsPerStep == 40,
+                    "Practice elsewhere records completed cycles and their average, without inventing form times")
+        try require(probe.engine.phase == .ready && onDisk() == probe.history.records
+                    && PracticeStore.file(at: file).initial.records.contains(manual),
+                    "A manual practice persists and reloads without starting the timer")
+        try require(probe.insights.last7 == previousWeek + 600 && probe.insights.last7Practices == previousCount + 1,
+                    "Manual practice contributes once to the weekly session average")
+        let old = try probe.addPractice(start: probe.currentDate.addingTimeInterval(-10 * 86_400), cycles: 2, seconds: 900)
+        try require(probe.history.records(on: old.day).contains(old) && probe.insights.last7Practices == previousCount + 1,
+                    "Backdated practice belongs to its own day and stays outside this week's average")
+        try PracticeHistory([manual, old]).document().write(to: backup)
+        probe.importHistory(from: backup)
+        try require(probe.history.records.count == 7 && onDisk().count == 7,
+                    "Importing a manual practice backup again does not duplicate entries")
+        func rejects(_ name: String, action: () throws -> PracticeRecord) throws {
+            var rejected = false
+            do { _ = try action() } catch is SessionModel.AddPracticeError { rejected = true }
+            try require(rejected, name)
+        }
+        try rejects("Future manual practice dates are rejected") {
+            try probe.addPractice(start: probe.currentDate.addingTimeInterval(3600), cycles: 1, seconds: 60)
+        }
+        try rejects("Zero cycles are rejected") { try probe.addPractice(start: probe.currentDate, cycles: 0, seconds: 60) }
+        try rejects("Zero practice time is rejected") { try probe.addPractice(start: probe.currentDate, cycles: 1, seconds: 0) }
+        practice(cycles: 1)
+        try rejects("Manual entry cannot interrupt an active practice") {
+            try probe.addPractice(start: probe.currentDate, cycles: 1, seconds: 60)
+        }
+        probe.close()
+        probe.addingPractice = true
+        probe.begin()
+        try require(probe.engine.phase == .ready, "The manual entry sheet prevents starting the timer underneath it")
+        probe.addingPractice = false
+        let blockedFile = folder.appendingPathComponent("blocked-parent")
+        try Data("a file, not a directory".utf8).write(to: blockedFile)
+        let unwritable = SessionModel(defaults: UserDefaults(suiteName: suiteName)!, automaticTicks: false,
+                                      store: .file(at: blockedFile.appendingPathComponent("history.json")))
+        try rejects("A failed manual save reports an error") {
+            try unwritable.addPractice(start: unwritable.currentDate, cycles: 1, seconds: 60)
+        }
+        try require(unwritable.history.isEmpty && onDisk().count == 7, "A failed save changes neither totals nor the existing history")
         try Data("not json".utf8).write(to: file)
         let reopened = PracticeStore.file(at: file)
         let setAside = (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?

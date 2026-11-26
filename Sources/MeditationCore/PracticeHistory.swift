@@ -137,9 +137,11 @@ public struct PracticeRecord: Equatable, Sendable {
     public let steps: [Int]?
     /// Where it was practiced: "mac" or "web".
     public let device: String?
+    /// A practice entered by the practitioner, rather than recorded by the app's timer.
+    public let manual: Bool
 
     public init?(id: String, start: PracticeTime, seconds: Int, cycles: Int, planned: Int, timing: TimingMode,
-                 steps: [Int]?, device: String?) {
+                 steps: [Int]?, device: String?, manual: Bool = false) {
         guard (1...100).contains(id.count), (0...Self.maximumSeconds).contains(seconds),
               SessionConfiguration.cycleRange.contains(planned), (0...planned).contains(cycles) else { return nil }
         if let steps {
@@ -147,6 +149,9 @@ public struct PracticeRecord: Equatable, Sendable {
                   steps.allSatisfy({ (0...Self.maximumSeconds).contains($0) }) else { return nil }
         }
         if let device { guard (1...40).contains(device.count) else { return nil } }
+        if manual {
+            guard cycles == planned, (1...86_400).contains(seconds), steps == nil else { return nil }
+        }
         self.id = id
         self.start = start
         self.seconds = seconds
@@ -155,6 +160,21 @@ public struct PracticeRecord: Equatable, Sendable {
         self.timing = timing
         self.steps = steps
         self.device = device
+        self.manual = manual
+    }
+
+    /// A completed practice elsewhere. Its aggregate time is known; individual form times are not.
+    /// Freestyle keeps version-one backups compatible: no app timer was used for this session.
+    public static func manuallyAdded(id: String, start: PracticeTime, seconds: Int, cycles: Int) -> PracticeRecord? {
+        guard (1...86_400).contains(seconds), SessionConfiguration.cycleRange.contains(cycles) else { return nil }
+        return PracticeRecord(id: id, start: start, seconds: seconds, cycles: cycles, planned: cycles,
+                              timing: .freestyle, steps: nil, device: nil, manual: true)
+    }
+
+    /// Manual entries describe complete cycles, each with five steps.
+    public var averageSecondsPerStep: Double? {
+        guard manual, cycles > 0 else { return nil }
+        return Double(seconds) / Double(cycles * Stage.all.count)
     }
 
     /// The practice under way or just ended, as the engine has counted it.
@@ -190,8 +210,13 @@ public struct PracticeRecord: Equatable, Sendable {
             guard let text = value as? String else { return nil }
             device = text
         }
+        var manual = false
+        if let value = object["manual"] {
+            guard let boolean = value as? NSNumber, CFGetTypeID(boolean) == CFBooleanGetTypeID() else { return nil }
+            manual = boolean.boolValue
+        }
         self.init(id: id, start: start, seconds: seconds, cycles: cycles, planned: planned, timing: timing,
-                  steps: steps, device: device)
+                  steps: steps, device: device, manual: manual)
     }
 
     /// A whole number, as JSON writes it: not a fraction, and not true or false.
@@ -211,6 +236,7 @@ public struct PracticeRecord: Equatable, Sendable {
                       "\"cycles\":\(cycles)", "\"planned\":\(planned)", "\"timing\":\(Self.quoted(timing.rawValue))"]
         if let steps { fields.append("\"steps\":[\(steps.map(String.init).joined(separator: ","))]") }
         if let device { fields.append("\"device\":\(Self.quoted(device))") }
+        if manual { fields.append("\"manual\":true") }
         return "{\(fields.joined(separator: ","))}"
     }
 

@@ -38,13 +38,16 @@ final class PracticeStore {
         }
     }
 
-    func save(_ history: PracticeHistory) {
-        guard let url else { return }
+    @discardableResult
+    func save(_ history: PracticeHistory) -> Bool {
+        guard let url else { return true }
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try history.document().write(to: url, options: .atomic)
+            return true
         } catch {
             fputs("The practice history couldn't be saved: \(error.localizedDescription)\n", stderr)
+            return false
         }
     }
 }

@@ -8,6 +8,7 @@ import {
 import {
   CivilDate, PracticeHistory, PracticeInsights, HistoryReadError, HistoryText, practiceTimeAt, todayNumber,
   recordFromEngine, isWorthKeeping, isCompleted, importSummary, readErrorMessage,
+  manuallyAddedRecord, averageSecondsPerStep, practiceTimeText,
 } from "./history.js";
 
 const MAXIMUM_UNOBSERVED_GAP = 2.5;
@@ -37,7 +38,7 @@ const storage = {
     try { return window.localStorage.getItem(key); } catch { return null; }
   },
   write(key, value) {
-    try { window.localStorage.setItem(key, value); } catch { /* Settings then last for this visit only. */ }
+    try { window.localStorage.setItem(key, value); return true; } catch { return false; }
   },
 };
 
@@ -267,14 +268,12 @@ function escape() {
   else if (engine.phase === "confirming") cancelConfirmation();
 }
 
-/// The journey, below setup and beside a finished practice's time: scrolls to it (SessionModel.showJourney).
+/// History follows both setup and the completed session (SessionModel.showJourney).
 /// Not during a practice.
 function showJourney() {
   if (engine.phase !== "ready" && engine.phase !== "complete") return;
   const behavior = reducedMotion.matches ? "auto" : "smooth";
-  // On completion the journey scrolls on its own, except on a phone, where the page does.
-  if (engine.phase === "complete" && getComputedStyle(journey).overflowY !== "visible") journey.scrollTo({ top: 0, behavior });
-  else journey.scrollIntoView({ block: "start", behavior });
+  journey.scrollIntoView({ block: "start", behavior });
   journeyTitle.focus({ preventScroll: true });
 }
 
@@ -305,6 +304,8 @@ async function importHistory(file) {
   }
   journeyState.month = null;
   journeyState.selected = null;
+  journeyState.visible = 5;
+  journeyState.expanded = null;
   render();
 }
 
@@ -625,6 +626,8 @@ function renderOverview() {
     shownPhase = engine.phase;
     journeyState.month = null;
     journeyState.selected = null;
+    journeyState.visible = 5;
+    journeyState.expanded = null;
     for (const scroller of [overviewScroll, journey, views.overview]) scroller.scrollTop = 0;
   }
   if (ready) {
@@ -647,6 +650,9 @@ function renderOverview() {
     setText(byId("planned-time"), TimeText.elapsed(engine.configuration.plannedSeconds));
     byId("planned-divider").hidden = !engine.configuration.isTimed;
     byId("planned-summary").hidden = !engine.configuration.isTimed;
+    setText(byId("time-summary-note"), "The time practiced in each step, with each cycle's total and its average per step. "
+      + (engine.configuration.isTimed ? "Pauses with a step count; the cards and time away don't."
+        : "Paused time, the cards, and time away don't count."));
     setShortcut("Return", "Practice again");
     renderTimeSummary();
   }
@@ -691,11 +697,93 @@ const dayDetail = byId("day-detail");
 const trendArrow = byId("trend-arrow");
 const trendMost = byId("trend-most");
 const rhythmNotes = byId("rhythm-notes");
-const BACKUP_NOTE = "Kept in this browser. A backup carries it to another device or the Mac app.";
-/// The month on the calendar (its first day's number), and the day picked in it; null for today's.
-const journeyState = { month: null, selected: null };
+const backupMenu = byId("backup-menu");
+/// A null selection shows recent sessions across all dates, with today's month on the calendar.
+const journeyState = { month: null, selected: null, visible: 5, expanded: null };
 
-const tiles = Object.fromEntries(["today", "week", "month", "streak", "cycles"].map((name) =>
+// MARK: Practice completed elsewhere
+
+const manualDialog = byId("manual-practice-dialog");
+const manualForm = byId("manual-practice-form");
+const manualStart = byId("manual-start");
+const manualCycles = byId("manual-cycles");
+const manualMinutes = byId("manual-minutes");
+const manualSeconds = byId("manual-seconds");
+const manualError = byId("manual-error");
+const stepAverageText = seconds => seconds == null ? "—" : seconds < 1 ? "<1 sec" : TimeText.elapsed(Math.round(seconds));
+
+function manualEntry() {
+  const integer = (input, low, high) => /^\d+$/.test(input.value) && Number(input.value) >= low && Number(input.value) <= high ? Number(input.value) : null;
+  const cycles = integer(manualCycles, 1, 108);
+  const minutes = integer(manualMinutes, 0, 1440);
+  const seconds = integer(manualSeconds, 0, 59);
+  const total = minutes != null && seconds != null ? minutes * 60 + seconds : null;
+  const start = new Date(manualStart.value);
+  const dateValid = Number.isFinite(start.getTime()) && manualStart.value >= manualStart.min && start <= new Date();
+  const timeValid = total != null && total >= 1 && total <= 86400;
+  const error = !dateValid ? "Choose a start date and time in the past."
+    : cycles == null ? "Enter 1–108 whole cycles."
+    : seconds == null ? "Enter whole seconds from 0 to 59."
+    : !timeValid && manualMinutes.value !== "" ? "Enter a total time from 1 second to 24 hours." : null;
+  return { start, cycles, total, dateValid, timeValid, error, valid: dateValid && cycles != null && timeValid };
+}
+
+function renderManualPractice() {
+  const entry = manualEntry();
+  setText(byId("manual-average"), stepAverageText(entry.timeValid && entry.cycles != null ? entry.total / (entry.cycles * STAGES.length) : null));
+  byId("save-manual-practice").disabled = !entry.valid;
+  setText(manualError, entry.error ?? "");
+  manualError.hidden = entry.error == null;
+  manualStart.setAttribute("aria-invalid", String(!entry.dateValid));
+  manualCycles.setAttribute("aria-invalid", String(entry.cycles == null));
+  manualMinutes.setAttribute("aria-invalid", String(!entry.timeValid && manualMinutes.value !== ""));
+  manualSeconds.setAttribute("aria-invalid", String(!/^\d+$/.test(manualSeconds.value) || Number(manualSeconds.value) > 59));
+}
+
+function openManualPractice() {
+  if (engine.phase !== "ready" && engine.phase !== "complete") return;
+  manualForm.reset();
+  const current = practiceTimeText(practiceTimeAt()).slice(0, 16);
+  manualStart.value = current;
+  manualStart.max = current;
+  renderManualPractice();
+  manualDialog.showModal();
+}
+
+manualForm.addEventListener("input", renderManualPractice);
+manualForm.addEventListener("change", renderManualPractice);
+manualForm.addEventListener("submit", event => {
+  event.preventDefault();
+  if (!manualDialog.open || (engine.phase !== "ready" && engine.phase !== "complete")) return;
+  const entry = manualEntry();
+  if (!entry.valid) { renderManualPractice(); return; }
+  const id = window.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  const record = manuallyAddedRecord(id, practiceTimeText(practiceTimeAt(entry.start)), entry.total, entry.cycles);
+  if (!record) return;
+  // Read other tabs' latest entries, and publish only after storage succeeds. Keep the form on failure.
+  const updated = new PracticeHistory((readHistory() ?? history).records);
+  updated.upsert(record);
+  if (!storage.write(HISTORY_KEY, updated.document())) {
+    setText(manualError, "This practice couldn’t be saved. Check that browser storage is available, then try again.");
+    manualError.hidden = false;
+    return;
+  }
+  history = updated;
+  refreshInsights();
+  journeyState.month = CivilDate.dayNumber(record.time.year, record.time.month, 1);
+  journeyState.selected = record.time.dayNumber;
+  const records = [...history.recordsOn(record.time.dayNumber)].reverse();
+  journeyState.visible = Math.max(5, records.findIndex(item => item.id === record.id) + 1);
+  journeyState.expanded = record.id;
+  model.backupMessage = `Added ${HistoryText.count(record.cycles, "cycle")} · ${HistoryText.minutes(record.seconds)} of practice.`;
+  manualDialog.close();
+  renderOverview();
+  const summary = [...byId("sessions-list").children].find(row => row.dataset.practiceId === record.id)?.querySelector("summary");
+  summary?.scrollIntoView({ block: "nearest", behavior: reducedMotion.matches ? "instant" : "smooth" });
+  summary?.focus({ preventScroll: true });
+});
+
+const tiles = Object.fromEntries(["today", "week", "month", "average"].map((name) =>
   [name, { value: byId(`tile-${name}`), detail: byId(`tile-${name}-detail`) }]));
 
 for (const weekday of insights.weekdayOrder) {
@@ -790,17 +878,18 @@ function setTile(name, value, detail, direction = null) {
 function practiceLine(record) {
   const parts = [HistoryText.time(record.time.hour, record.time.minute), HistoryText.minutes(record.seconds),
     isCompleted(record) ? HistoryText.count(record.cycles, "cycle") : `${record.cycles} of ${record.planned} cycles`];
-  if (record.timing === FREESTYLE) parts.push("freestyle");
+  if (record.manual) parts.push("added manually");
+  else if (record.timing === FREESTYLE) parts.push("freestyle");
   if (record.device) parts.push(record.device === "web" ? "Web" : record.device === "mac" ? "Mac" : record.device);
   return parts.join(" · ");
 }
 
 function renderJourney() {
   const empty = history.isEmpty;
-  setText(journeySubtitle, empty ? "Nothing kept yet." : `${HistoryText.count(insights.all.practices, "practice")} since ${HistoryText.date(insights.firstDay)} · ${HistoryText.minutes(insights.all.seconds)} in all`);
+  setText(journeySubtitle, empty ? "Nothing kept yet." : `${HistoryText.count(insights.all.practices, "practice")} · ${HistoryText.minutes(insights.all.seconds)} · ${HistoryText.count(insights.all.cycles, "cycle")} since ${HistoryText.date(insights.firstDay)}`);
   exportButton.disabled = empty;
-  setText(backupMessage, model.backupMessage ?? BACKUP_NOTE);
-  backupMessage.classList.toggle("is-result", model.backupMessage != null);
+  setText(backupMessage, model.backupMessage ?? "");
+  backupMessage.hidden = model.backupMessage == null;
   journeyEmpty.hidden = !empty;
   journeyContent.hidden = empty;
   if (empty) return;
@@ -808,9 +897,12 @@ function renderJourney() {
   setTile("today", HistoryText.minutes(insights.todayTotals.seconds), insights.todayDetail);
   setTile("week", HistoryText.minutes(insights.last7), insights.weekComparison.text, insights.weekComparison.direction);
   setTile("month", HistoryText.minutes(insights.last30), insights.monthComparison.text, insights.monthComparison.direction);
-  setTile("streak", insights.streakValue, insights.streakDetail);
-  setTile("cycles", String(insights.all.cycles), insights.cyclesDetail);
+  setTile("average", insights.averageSessionSeconds == null ? "—" : HistoryText.minutes(insights.averageSessionSeconds),
+    "Per session · last 7 days");
+  byId("average-session").title = `Total practice time divided by all ${insights.last7Practices} saved sessions in the last 7 days, including today`;
+  setText(byId("history-streak"), `Current streak: ${insights.streakValue} · Best: ${HistoryText.count(insights.bestStreak, "day")}`);
   renderCalendar();
+  renderSessions();
   renderTrend();
   renderRhythm();
 }
@@ -823,7 +915,7 @@ function renderCalendar() {
   const length = CivilDate.daysInMonth(shown.month, shown.year);
   const leading = (CivilDate.weekday(first) - insights.firstWeekday + 7) % 7;
   const earliest = CivilDate.fromDayNumber(insights.firstDay ?? today);
-  const selected = journeyState.selected ?? today;
+  const selected = journeyState.selected;
   setText(calendarMonth, `${HistoryText.months[shown.month - 1]} ${shown.year}`);
   previousMonth.disabled = shown.year * 12 + shown.month <= earliest.year * 12 + earliest.month;
   nextMonth.disabled = shown.year * 12 + shown.month >= current.year * 12 + current.month;
@@ -850,26 +942,68 @@ function renderCalendar() {
     cell.title = totals.practices === 0 ? "" : dayLabel(day, totals);
   });
 
-  // The day picked: its time in gold, its cycles in blue, and how many practices.
-  const totals = insights.totals(selected);
-  const records = history.recordsOn(selected);
-  const head = make("p", "day-detail-head");
-  head.append(make("span", "day-detail-title", HistoryText.dayTitle(selected)));
-  if (totals.practices > 0) {
-    const sums = make("span", "day-detail-totals");
-    sums.append(make("span", "day-detail-time", HistoryText.minutes(totals.seconds)), make("span", "", "·"),
-      cycleCount(HistoryText.count(totals.cycles, "cycle")), make("span", "", "·"),
-      make("span", "", HistoryText.count(totals.practices, "practice")));
-    head.append(sums);
-  }
-  const lines = records.length === 0
-    ? [make("p", "", selected === today ? "No practice yet today." : "No practice on this day.")]
-    : records.slice(0, 3).map((record) => make("p", "", practiceLine(record)));
-  if (records.length > 3) lines.push(make("p", "", `and ${records.length - 3} more`));
-  dayDetail.replaceChildren(head, ...lines);
+  setText(dayDetail, selected == null ? "Select a day to see its sessions." : dayLabel(selected, insights.totals(selected)));
 }
 
-/// Another month: today stays picked in this one; in another, its last day with practice, or its first.
+function renderSessions() {
+  const selected = journeyState.selected;
+  const records = [...(selected == null ? history.records : history.recordsOn(selected))].reverse();
+  setText(byId("sessions-title"), selected == null ? "Recent sessions" : HistoryText.dayTitle(selected));
+  byId("all-practice-dates").hidden = selected == null;
+  const empty = byId("sessions-empty");
+  empty.hidden = records.length !== 0;
+  setText(empty, selected === insights.today ? "No practice yet today." : "No practice on this day.");
+  const list = byId("sessions-list");
+  const rows = records.slice(0, journeyState.visible).map(record => {
+    const row = make("details", "session");
+    row.dataset.practiceId = record.id;
+    row.open = journeyState.expanded === record.id;
+    const summary = make("summary");
+    const heading = make("span", "session-heading");
+    const mode = record.manual ? "Added manually" : { perStep: "Time per step", total: "Total time", freestyle: "Freestyle" }[record.timing];
+    const cycles = isCompleted(record) ? HistoryText.count(record.cycles, "cycle") : `${record.cycles} of ${record.planned} cycles`;
+    heading.append(make("span", "session-date", `${HistoryText.date(record.time.dayNumber)} · ${HistoryText.time(record.time.hour, record.time.minute)}`),
+      make("span", "session-meta", `${cycles} · ${mode}`));
+    summary.append(heading, make("span", "session-time", HistoryText.minutes(record.seconds)));
+    summary.setAttribute("aria-label", `${HistoryText.date(record.time.dayNumber)}, ${practiceLine(record)}. ${record.manual ? "Show average time per step." : "Show time by form."}`);
+    const detail = make("div", "session-detail");
+    detail.append(make("p", "", isCompleted(record) ? "Completed" : "Ended early"));
+    if (record.steps) {
+      detail.append(make("p", "eyebrow", "Time by form · all cycles"));
+      STAGES.forEach((stage, index) => {
+        const step = make("div", "session-step");
+        const name = make("span", "session-step-name", stage.title);
+        name.lang = "hi";
+        step.append(make("span", "session-step-number", pad2(stage.id)), name,
+          make("span", "session-step-time", TimeText.elapsed(record.steps[index])));
+        detail.append(step);
+      });
+    } else if (record.manual) {
+      const average = make("div", "session-average");
+      average.append(make("span", "", "Average per step"), make("strong", "", stepAverageText(averageSecondsPerStep(record))));
+      detail.append(average, make("p", "", `${TimeText.elapsed(record.seconds)} ÷ (${record.cycles} × 5 steps). Individual form times weren’t recorded.`));
+    } else detail.append(make("p", "", "Time by form wasn’t saved for this practice."));
+    if (record.device) detail.append(make("p", "", `Practiced on ${record.device === "mac" ? "Mac" : record.device === "web" ? "Web" : record.device}`));
+    row.append(summary, detail);
+    row.addEventListener("toggle", () => {
+      if (!row.isConnected) return;
+      if (row.open) {
+        journeyState.expanded = record.id;
+        for (const other of list.children) if (other !== row) other.open = false;
+      } else if (journeyState.expanded === record.id) journeyState.expanded = null;
+    });
+    return row;
+  });
+  list.replaceChildren(...rows);
+  const more = byId("more-practices");
+  more.hidden = records.length <= journeyState.visible;
+  setText(more, `Show more sessions (${Math.max(0, records.length - journeyState.visible)} remaining)`);
+  const count = byId("sessions-count");
+  count.hidden = records.length === 0;
+  setText(count, `${Math.min(records.length, journeyState.visible)} of ${HistoryText.count(records.length, "session")} · Most recent first`);
+}
+
+/// In the current month show recent sessions; in another, pick its last day with practice, or its first.
 function stepMonth(months) {
   const current = CivilDate.fromDayNumber(journeyState.month ?? insights.today);
   const index = current.year * 12 + current.month - 1 + months;
@@ -878,6 +1012,8 @@ function stepMonth(months) {
   const first = CivilDate.dayNumber(year, month, 1);
   const today = CivilDate.fromDayNumber(insights.today);
   journeyState.month = first;
+  journeyState.visible = 5;
+  journeyState.expanded = null;
   if (year === today.year && month === today.month) {
     journeyState.selected = null;
   } else {
@@ -1266,6 +1402,7 @@ byId("setup").addEventListener("submit", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  if (!backupMenu.contains(event.target)) backupMenu.open = false;
   const button = event.target.closest("[data-action]");
   if (!button || button.disabled) return;
   switch (button.dataset.action) {
@@ -1279,13 +1416,30 @@ document.addEventListener("click", (event) => {
     case "practice-again": practiceAgain(); break;
     case "fullscreen": isFullScreen() ? exitFullScreen() : enterFullScreen(); break;
     case "journey": showJourney(); break;
-    case "export-backup": exportHistory(); break;
-    case "import-backup": importFile.click(); break;
+    case "add-practice": openManualPractice(); break;
+    case "cancel-manual": manualDialog.close(); break;
+    case "export-backup": backupMenu.open = false; exportHistory(); break;
+    case "import-backup": backupMenu.open = false; importFile.click(); break;
     case "previous-month": stepMonth(-1); break;
     case "next-month": stepMonth(1); break;
     case "select-day":
       journeyState.selected = Number(button.dataset.day);
+      journeyState.visible = 5;
+      journeyState.expanded = null;
       renderJourney();
+      break;
+    case "all-dates":
+      journeyState.selected = null;
+      journeyState.month = null;
+      journeyState.visible = 5;
+      journeyState.expanded = null;
+      renderJourney();
+      byId("sessions-title").focus({ preventScroll: true });
+      break;
+    case "more-practices":
+      journeyState.visible += 5;
+      renderSessions();
+      if (button.hidden) byId("sessions-list").lastElementChild?.querySelector("summary").focus({ preventScroll: true });
       break;
     default: break;
   }
@@ -1308,7 +1462,7 @@ window.addEventListener("storage", (event) => {
 const isTextField = (element) => element instanceof HTMLInputElement && element.type === "text";
 const isToggle = (element) => element instanceof HTMLSelectElement
   || (element instanceof HTMLInputElement && element.type === "checkbox");
-const isControl = (element) => element instanceof HTMLButtonElement || isToggle(element);
+const isControl = (element) => element instanceof HTMLButtonElement || element?.tagName === "SUMMARY" || isToggle(element);
 
 /// Event times share performance.now()'s clock; fall back to now for any that don't.
 function eventTime(event) {
@@ -1317,16 +1471,25 @@ function eventTime(event) {
   return Number.isFinite(stamp) && stamp > 0 && Math.abs(current - stamp) < 60 ? stamp : current;
 }
 
-/// Space is only text in a setup field (or a toggle's own key); elsewhere it must not press a button.
-const spaceBelongsTo = (target) => engine.phase !== "running" && (isTextField(target) || isToggle(target));
+/// Outside practice, Space activates focused controls, including history disclosures. During a
+/// paused practice it must not activate Resume or Restart as an unexpected side effect.
+const spaceBelongsTo = (target) => (engine.phase === "ready" || engine.phase === "complete")
+  ? true
+  : engine.phase !== "running" && (isTextField(target) || isToggle(target));
 
 document.addEventListener("keydown", (event) => {
-  if (event.isComposing) return;
+  if (event.isComposing || manualDialog.open) return;
   const target = event.target;
   const modified = event.metaKey || event.ctrlKey || event.altKey;
 
   if (event.key === "Escape") {
     if (modified) return;
+    if (backupMenu.open && (engine.phase === "ready" || engine.phase === "complete")) {
+      backupMenu.open = false;
+      backupMenu.querySelector("summary").focus({ preventScroll: true });
+      event.preventDefault();
+      return;
+    }
     lastEscapeKey = now();
     if (!event.repeat) escape();
     if (engine.phase !== "ready" && engine.phase !== "complete") event.preventDefault();

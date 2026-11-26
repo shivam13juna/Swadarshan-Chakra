@@ -20,7 +20,7 @@
 
 ## What it does
 
-Swadarshan Chakra guides you through five consecutive forms of spiritual self-awareness, one at a time. Each form's picture fills your screen while you contemplate it. When its time is up, the hand on the cycle of ages turns to where the next form stands, and the next form begins. After the fifth, the circle starts again. One pass through all five forms is a **cycle**. At the end, you can see how you spent your time, step by step and cycle by cycle. Every practice is kept, and **your journey**, below the setup screen and beside every finished practice, shows how your practice is growing: a calendar of your days and their cycles, your trend, and the hours you tend to practice.
+Swadarshan Chakra guides you through five consecutive forms of spiritual self-awareness, one at a time. Each form's picture fills your screen while you contemplate it. When its time is up, the hand on the cycle of ages turns to where the next form stands, and the next form begins. After the fifth, the circle starts again. One pass through all five forms is a **cycle**. At the end, you can see how you spent your time, step by step and cycle by cycle. Every practice is kept, and **your journey**, below setup and every finished practice, shows how your practice is growing: a calendar of your days and their cycles, your trend, and the hours you tend to practice.
 
 You choose how many cycles to practice and how much time to give them. The app keeps time, so you don't have to. Or practice freestyle, with no timer at all.
 
@@ -130,30 +130,38 @@ Each cycle opens with a short card: the gold chakra turning in the same soft gol
 
 ### 5. Finish
 
-![The completion screen: your journey on the left, with this practice in it; on the right, the time practiced and planned, and a table of each cycle's time in each step, its total, and its average per step](docs/screenshots/complete.jpg)
+![The completed practice: time practiced and planned, a breakdown by step and cycle, and the history section below](docs/screenshots/complete.jpg)
 
-When the last cycle ends, the panel on the right shows how many cycles you completed and how long you actually practiced. In timed modes, that includes time paused with a step in front of you. Freestyle counts only time spent running; pauses are excluded from both the total and each step's time. Time away doesn't count in either mode: in another app, or with your Mac asleep or locked.
+When the last cycle ends, the main panel shows how many cycles you completed and how long you actually practiced. In timed modes, that includes time paused with a step in front of you. Freestyle counts only time spent running; pauses are excluded from both the total and each step's time. Time away doesn't count in either mode: in another app, or with your Mac asleep or locked.
 
 Below that, **Your time** shows how you spent it. Each cycle has a row with the time you gave each of the five steps, then **Average per step** and **Total this cycle**. With more than one cycle, a last row adds them all up. A long practice scrolls; the column titles and that last row stay in view.
 
-On the left, in place of the circle, is [your journey](#your-journey), with this practice already in it. It scrolls on its own, so the panel stays in view.
+Below the summary, [your practice history](#your-journey) already includes this session. Scroll down or choose **View history** to see it.
 
 Press <kbd>Return</kbd> to practice again.
 
 ## Your journey
 
-![Your journey, below the setup screen: totals for today, the last 7 and 30 days, your streak, and your cycles; a calendar of November with each day's cycles and time; twelve weeks rising; and the hours of the week you practice](docs/screenshots/journey.jpg)
+![Your practice history: four summary cards above a calendar and a list of recent sessions](docs/screenshots/journey.jpg)
 
-Every practice is kept once it has a minute of practice or a whole cycle, however it ends: finished, ended from the pause screen, or with the window closed. Your journey is below the setup screen: scroll down, click **Today** at the top or **Your journey** at the foot of the circle, or press <kbd>⌘</kbd> <kbd>J</kbd> (<kbd>J</kbd> on the web). When a practice ends, it is beside your time.
+Every practice is kept once it has a minute of practice or a whole cycle, however it ends: finished, ended from the pause screen, or with the window closed. History follows the chakra and practice settings in one continuous scroll. A gold divider, a quieter background, and the **Your practice history** heading mark the transition. Scroll down, click **Today** or **Scroll to your history**, or press <kbd>⌘</kbd> <kbd>J</kbd> (<kbd>J</kbd> on the web). The practice controls scroll away with the opening section. History appears below the session summary after a practice ends too.
 
-- **Totals:** today, the last 7 and 30 days (each against the 7 or 30 days before), your streak of days in a row, and all your cycles. 108 cycles make a mala.
-- **Calendar:** each day shaded by how long you practiced, with its cycles in blue at the bottom left and its time at the bottom right. Click a day to see its practices: when each began, how long it lasted, and its cycles.
-- **Trend:** your last twelve weeks, and whether your practice is rising, steady, or easing off, from the last four weeks against the four before.
+- **Summary:** time practiced today and in the last 7 and 30 days, with comparisons to the previous periods. **Average session** divides total practice time by all saved sessions begun in the last seven calendar days, including today; timed, freestyle, manually added, and sessions ended early all count. Its label reads **Per session · last 7 days**, and it shows a dash when there are no sessions in that period. Lifetime time, practices, and cycles appear beneath the section title.
+- **Calendar and sessions:** the calendar is beside a list of recent sessions, newest first. Select a day to filter the list, **All dates** to return, or **Show more sessions** to reach older entries. Expand a session to see its mode, completion status, device, and time spent in each form across all cycles, when that breakdown was saved. A day with no sessions says so.
+- **Patterns:** below the sessions, your current and best streaks, followed by your last twelve weeks and whether your practice is rising, steady, or easing off, from the last four weeks against the four before.
 - **When you practice:** the hours of the week you tend to practice, over the last twelve weeks. Notes beside it name your quietest part of the day, a good time for another cycle, and count the mornings you practiced at amrit vela, between 3 and 5 am.
+
+![A past session expanded to show time in each of the five forms](docs/screenshots/history-session.jpg)
+
+### Practice done elsewhere
+
+Choose **Add practice**, beside the history title. Enter when you started, how many complete cycles you spun (1–108), and the total time in minutes and seconds (up to 24 hours). The form previews **Average per step**: total time divided by the number of cycles × five steps. For example, **3 cycles in 10 minutes → 40 seconds per step**.
+
+**Save practice** adds one session and opens it on its date in the calendar. It is labelled **Added manually** and contributes to your totals, patterns, and weekly session average. Its calculated average remains visible when you expand it; individual form times are left unspecified. Manual entries travel in backups too. Cancel or <kbd>Esc</kbd> closes the form without adding anything.
 
 ### Moving your history to another device
 
-**Export backup…** saves every practice to a file, such as `Swadarshan Chakra backup 2026-11-18.json`. On another Mac, or in the web version, **Import backup…** adds the practices it doesn't have yet. Nothing is replaced, and importing the same file twice changes nothing, so you can carry your history back and forth: Mac to Mac, browser to browser, or between the Mac app and a browser, either way. In the Mac app, both are in the **File** menu too.
+The **Backups** menu beside the history title contains **Import backup…** and **Export backup…**. Export saves every practice to a file, such as `Swadarshan Chakra backup 2026-11-18.json`. On another Mac, or in the web version, **Import backup…** adds the practices it doesn't have yet. Nothing is replaced, and importing the same file twice changes nothing, so you can carry your history back and forth: Mac to Mac, browser to browser, or between the Mac app and a browser, either way. In the Mac app, both are in the **File** menu too.
 
 ## Full screen or a window
 
@@ -213,7 +221,7 @@ APP="dist/Swadarshan Chakra.app/Contents/MacOS/SwadarshanChakra"
 "$APP" --verify-history              # practices through the app's own model, kept in a temporary file; off screen, about a second
 ```
 
-**Web version.** `web/` is the same practice for the browser, with no build step. `engine.js` is a port of `MeditationCore`; `Tests/web/engine-checks.mjs` mirrors the core checks, and `check.sh` runs it when Node is installed. `history.js` ports the practice history. `Tests/web/history-checks.mjs` and the core checks read one shared fixture, `Tests/fixtures/history-v1.json`, and expect the same numbers and words, so each version reads the other's backups. `app.js` and `app.css` follow the SwiftUI screens. Preview it locally with `firebase serve --only hosting`.
+**Web version.** `web/` is the same practice for the browser, with no build step. `engine.js` is a port of `MeditationCore`; `Tests/web/engine-checks.mjs` mirrors the core checks, and `check.sh` runs it when Node is installed. `history.js` ports the practice history. `Tests/web/history-checks.mjs` and the core checks read the shared fixtures `Tests/fixtures/history-v1.json` and `history-manual-v1.json`, and expect the same numbers and words, so each version reads the other's backups. The optional `manual` flag preserves manually entered practices without inventing per-form timings. `app.js` and `app.css` follow the SwiftUI screens. Preview it locally with `firebase serve --only hosting`.
 
 **Publishing.** Pushing to `main` publishes both:
 

@@ -26,9 +26,10 @@ final class SessionModel: NSObject, ObservableObject {
     /// Every practice kept on this Mac, and what it says.
     @Published private(set) var history: PracticeHistory
     @Published private(set) var insights: PracticeInsights
-    /// Asks setup to scroll down to the journey below it, or completion to the top of its journey.
+    /// Asks setup or completion to scroll down to practice history.
     /// The screen showing it sets it back.
     @Published var journeyRequested = false
+    @Published var addingPractice = false
     /// What the last export or import did, shown with the journey's backup buttons.
     @Published private(set) var backupMessage: String?
 
@@ -133,7 +134,7 @@ final class SessionModel: NSObject, ObservableObject {
     }
 
     func begin() {
-        guard let configuration else { return }
+        guard !addingPractice, let configuration else { return }
         // Freestyle saves the time fields too, for when a timer is chosen again.
         if !configuration.isTimed, let enteredTime { SessionPreferences.save(enteredTime, to: defaults) }
         SessionPreferences.save(configuration, to: defaults)
@@ -223,7 +224,7 @@ final class SessionModel: NSObject, ObservableObject {
 
     // MARK: History
 
-    /// The journey, below setup and beside the finished practice's time: scrolls to it. Not during a practice.
+    /// History, below setup and the finished practice: scrolls to it. Not during a practice.
     func showJourney() {
         guard engine.phase == .ready || engine.phase == .complete else { return }
         refreshInsights()
@@ -232,6 +233,36 @@ final class SessionModel: NSObject, ObservableObject {
 
     /// Today on this Mac's clock.
     var today: Int { PracticeTime(clock())?.dayNumber ?? insights.today }
+    var currentDate: Date { clock() }
+
+    enum AddPracticeError: LocalizedError {
+        case duringPractice, invalidStart, invalidCounts, saveFailed
+        var errorDescription: String? {
+            switch self {
+            case .duringPractice: return "Finish this practice before adding another."
+            case .invalidStart: return "Choose a start date and time in the past."
+            case .invalidCounts: return "Enter 1–108 completed cycles and a total time from 1 second to 24 hours."
+            case .saveFailed: return "This practice couldn’t be saved. Please try again."
+            }
+        }
+    }
+
+    /// Save a completed practice elsewhere without changing the session engine. The form retains its
+    /// values on failure; on success the new record lets history reveal this exact entry, even far back.
+    func addPractice(start: Date, cycles: Int, seconds: Int) throws -> PracticeRecord {
+        guard engine.phase == .ready || engine.phase == .complete else { throw AddPracticeError.duringPractice }
+        guard start <= clock(), let time = PracticeTime(start) else { throw AddPracticeError.invalidStart }
+        guard let record = PracticeRecord.manuallyAdded(id: UUID().uuidString, start: time, seconds: seconds, cycles: cycles) else {
+            throw AddPracticeError.invalidCounts
+        }
+        var updated = history
+        updated.upsert(record)
+        guard store.save(updated) else { throw AddPracticeError.saveFailed }
+        history = updated
+        refreshInsights()
+        backupMessage = "Added \(HistoryText.count(cycles, "cycle")) · \(HistoryText.minutes(seconds)) of practice."
+        return record
+    }
 
     /// A window opened on a new day begins it: Today and the journey count from midnight.
     func beginNewDayIfNeeded() {

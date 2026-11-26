@@ -216,8 +216,7 @@ button { cursor: pointer; }
   .shortcut { display: none; }
 }
 
-/* Overview: header, the five forms in a circle, the practice panel, and the footer. Setup fills the
-   window and scrolls down to the journey; completion sets the journey beside the practice's time. */
+/* The opening practice section and history follow each other in one scroll. */
 
 .overview {
   --gutter: 46px;
@@ -321,35 +320,25 @@ button { cursor: pointer; }
   overscroll-behavior: contain;
 }
 
-/* The first screen: the circle and the practice panel, the height of the window's middle. */
+/* Leave the history heading visible at the foot of an ordinary desktop window. */
+.practice-section {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-height: max(659px, calc(100% - 85px));
+  padding-bottom: 32px;
+}
+
 .overview-body {
   display: flex;
-  gap: 40px;
-  height: 100%;
-}
-
-/* Completion: the journey in the circle's place, scrolling on its own; the time beside it stays in view.
-   On the largest displays the two stay together, centred. */
-#app[data-phase="complete"] .overview-scroll {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
-  overflow: hidden;
-}
-
-#app[data-phase="complete"] .overview-body { order: 2; flex: none; height: auto; }
-#app[data-phase="complete"] .orbit { display: none; }
-
-#app[data-phase="complete"] .journey {
-  order: 1;
-  flex: 0 1 1480px;
-  min-width: 0;
+  flex: 1;
   min-height: 0;
-  margin: 0;
-  padding-top: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  gap: 40px;
 }
+
+/* The completed session has the main space; its saved history follows below. */
+#app[data-phase="complete"] .overview-body { justify-content: center; }
+#app[data-phase="complete"] .orbit { display: none; }
 
 .overview-footer {
   display: flex;
@@ -361,6 +350,7 @@ button { cursor: pointer; }
 }
 
 .overview-footer .shortcut { margin-right: auto; }
+.overview-footer .checkbox { margin-left: auto; }
 
 .checkbox {
   display: inline-flex;
@@ -379,26 +369,18 @@ button { cursor: pointer; }
   cursor: pointer;
 }
 
-.footer-tag {
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-}
-
 #app[data-phase="complete"] .setup-panel { display: none; }
 
-/* TimeSummaryPanel: on completion, in the setup panel's place, its top level with the journey's. */
+/* TimeSummaryPanel: the completed practice above history. */
 .summary-panel {
   display: none;
   flex: none;
   flex-direction: column;
-  align-self: flex-start;
+  align-self: center;
   gap: 18px;
   /* Wide enough on a large display for every column title to fit on one line. */
   container: summary / inline-size;
-  width: clamp(470px, 36vw, 560px);
+  width: min(900px, 100%);
   max-height: 100%;
   padding: 28px;
   border: 0.7px solid rgba(217, 184, 117, 0.17);
@@ -710,12 +692,8 @@ button { cursor: pointer; }
 .orbit.is-crowded.is-preview .orbit-chakra { display: block; }
 .orbit.is-crowded.is-preview .active-focus { display: none; }
 
-/* "Your journey", in the open space at the foot of the circle (MeditationView's journeyCue). */
+/* A scroll cue at the foot of the opening section. */
 .journey-cue {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -726,11 +704,10 @@ button { cursor: pointer; }
   color: var(--muted);
   font-size: 9px;
   font-weight: 500;
-  letter-spacing: 2px;
+  letter-spacing: 1.6px;
   line-height: 1.2;
   text-transform: uppercase;
   white-space: nowrap;
-  transform: translateX(-50%);
 }
 
 .journey-cue .icon { width: 9px; height: 9px; stroke-width: 2; }
@@ -950,20 +927,20 @@ button { cursor: pointer; }
 }
 
 /* Smaller windows (MeditationView's compact layout) */
-@media (max-width: 1179px), (max-height: 759px) {
+@media (max-width: 1179px), (max-height: 849px) {
   .overview { --gutter: 26px; gap: 13px; padding: 20px var(--gutter); }
   .overview-header { height: 43px; }
   .brand-mark { width: 40px; height: 40px; }
   .brand-hindi { font-size: 23px; }
   .status { margin-right: 8px; }
-  .overview-body,
-  #app[data-phase="complete"] .overview-scroll { gap: 22px; }
+  .overview-body { gap: 22px; }
+  .practice-section { min-height: max(563px, calc(100% - 91px)); gap: 14px; padding-bottom: 24px; }
   /* Tighter spacing leaves room for the countdown-bar setting at 1024 × 640. */
   .setup-panel { gap: 14px; width: 286px; padding: 22px; }
   .setup-intro { gap: 9px; }
   .setup-title { font-size: 28px; }
   .setup-fields { gap: 16px; }
-  .summary-panel { gap: 12px; width: 372px; padding: 22px; }
+  .summary-panel { gap: 12px; padding: 22px; }
   .completion { gap: 14px; }
   .completion-head { gap: 12px; }
   .seal { width: 31px; height: 31px; }
@@ -1002,26 +979,25 @@ button { cursor: pointer; }
     display: flex;
     flex: none;
     flex-direction: column;
-    gap: 30px;
+    gap: 0;
     margin-inline: 0;
     padding-inline: 0;
     overflow: visible;
   }
 
-  .overview-body { flex: none; flex-direction: column; gap: 22px; height: auto; }
-  #app[data-phase="complete"] .overview-body { order: 1; }
-  #app[data-phase="complete"] .journey { order: 2; flex: none; overflow: visible; }
+  .practice-section { height: auto; min-height: 0; gap: 24px; padding-bottom: 32px; }
+  .overview-body { flex: none; flex-direction: column; gap: 22px; }
   .orbit { flex: none; width: 100%; height: min(112vw, 560px); }
-  .journey-cue { display: none; }
   .setup-panel { width: 100%; max-width: 440px; }
   /* The page scrolls instead of the table. */
-  .summary-panel { align-self: center; width: 100%; max-width: 440px; max-height: none; }
+  .summary-panel { align-self: center; width: 100%; max-width: 900px; max-height: none; }
   .time-table-wrap { overflow: visible; }
   .time-table thead th,
   .time-table tfoot th,
   .time-table tfoot td { position: static; background: none; }
   .overview-footer { justify-content: center; text-align: center; }
   .overview-footer .shortcut { margin-right: 0; }
+  .overview-footer .checkbox { margin-left: 0; }
 }
 
 @media (max-width: 479px) {
@@ -1305,9 +1281,7 @@ button { cursor: pointer; }
 .cycle-count { display: inline-flex; align-items: center; gap: 0.2em; color: var(--cycles); }
 .cycle-icon { width: 0.8em; height: 0.8em; stroke-width: 2.2; }
 
-/* JourneyView: below setup, a scroll away, a page of its own once scrolled to; on completion, the column
-   beside the time. It arranges itself by its own width, as the Mac app does: wide, from 1150 points; medium,
-   from 720; narrow below that. */
+/* History has a full-width gold rule and a quieter surface within the same continuous scroll. */
 
 .journey {
   container: journey / inline-size;
@@ -1317,20 +1291,28 @@ button { cursor: pointer; }
   width: 100%;
   max-width: 1480px;
   min-height: 100%;
-  margin: 34px auto 0;
-  padding-bottom: 4px;
+  margin: 0 auto;
+  padding: 28px;
+  border-top: 1px solid rgba(217, 184, 117, 0.35);
+  background: linear-gradient(to bottom, rgba(16, 20, 31, 0.72), rgba(16, 20, 31, 0.22));
 }
 
-.journey-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 20px; }
+.journey-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px 20px; }
 .journey-intro { display: flex; flex-direction: column; gap: 10px; }
 .journey-intro .setup-title:focus { outline: none; }
-.backup { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.backup-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.history-actions { display: flex; align-items: center; gap: 12px; flex: none; }
+.history-actions > button { white-space: nowrap; gap: 5px; }
+.backup { flex: none; }
+.backup-menu { position: relative; }
+.backup-menu > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; }
+.backup-menu > summary::-webkit-details-marker { display: none; }
+.backup-menu > summary .icon { width: 12px; height: 12px; }
+.backup-menu > summary:focus-visible { outline: 1px solid var(--gold); outline-offset: 3px; }
+.backup-buttons { position: absolute; top: calc(100% + 8px); right: 0; z-index: 2; display: flex; flex-direction: column; gap: 6px; width: 190px; padding: 8px; border: 1px solid rgba(217, 184, 117, 0.25); border-radius: 12px; background: var(--panel); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); }
 .backup-buttons .quiet-button { gap: 8px; }
 .backup-buttons .icon { width: 14px; height: 14px; }
 .backup-buttons .quiet-button:disabled { opacity: 0.45; cursor: default; }
-.backup-message { max-width: 430px; color: var(--muted); font-size: 11px; line-height: 1.45; text-align: right; }
-.backup-message.is-result { color: var(--gold); }
+.backup-message { color: var(--gold); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 
 .journey-card {
   padding: 20px;
@@ -1354,8 +1336,8 @@ button { cursor: pointer; }
 
 .journey-content { display: flex; flex-direction: column; gap: 18px; }
 
-/* Five in a row, or three and two where five won't fit; tiles in a row share its height. */
-.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+/* Four totals, becoming two by two on narrow screens. */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .tile { display: flex; flex-direction: column; gap: 8px; min-height: 80px; padding: 16px; }
 
 .tile .label {
@@ -1378,24 +1360,47 @@ button { cursor: pointer; }
   white-space: nowrap;
 }
 
-#tile-cycles { color: var(--cycles); }
-.tile .detail { display: flex; align-items: baseline; gap: 4px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.tile .detail { display: flex; align-items: baseline; gap: 4px; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .tile .detail.is-up { color: var(--gold); }
 .tile .detail .icon { position: relative; top: 1px; width: 9px; height: 9px; stroke-width: 2.4; }
 
-/* Wide: the calendar beside the trend and, under it, the hours of the week; the trend takes whatever
-   height the calendar leaves it. */
+/* Calendar and sessions first. Trends and the time-of-day heatmap follow below. */
 .journey-grid {
   display: grid;
-  grid-template-columns: 460px minmax(0, 1fr);
-  grid-template-rows: 1fr auto;
-  grid-template-areas: "calendar trend" "calendar rhythm";
+  grid-template-columns: 440px minmax(0, 1fr);
+  align-items: start;
   gap: 16px;
 }
 
-.calendar-card { display: flex; grid-area: calendar; flex-direction: column; gap: 12px; }
-.trend-card { display: flex; grid-area: trend; flex-direction: column; gap: 12px; }
-.rhythm-card { container: rhythm / inline-size; display: flex; grid-area: rhythm; flex-direction: column; gap: 12px; }
+.calendar-card { display: flex; flex-direction: column; gap: 12px; }
+.trend-card { display: flex; flex-direction: column; gap: 12px; }
+.rhythm-card { container: rhythm / inline-size; display: flex; flex-direction: column; gap: 12px; }
+.patterns { display: flex; flex-direction: column; gap: 16px; }
+.patterns-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 18px; color: var(--muted); font-size: 12px; }
+.history-footer { padding-top: 12px; color: var(--muted); font-size: 10px; letter-spacing: 1px; }
+.sessions-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.sessions-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.sessions-head > button { flex: none; }
+.sessions-empty { display: grid; place-items: center; min-height: 130px; color: var(--muted); font-size: 13px; }
+.sessions-count { color: var(--muted); font-size: 11px; }
+#more-practices { align-self: flex-start; }
+.session { border-top: 1px solid rgba(245, 237, 217, 0.09); }
+.session > summary { display: flex; align-items: center; gap: 12px; padding: 14px 0; list-style: none; cursor: pointer; }
+.session > summary::-webkit-details-marker { display: none; }
+.session > summary::after { content: ""; width: 6px; height: 6px; border-right: 1px solid var(--muted); border-bottom: 1px solid var(--muted); transform: rotate(45deg); flex: none; margin: 0 3px 3px; }
+.session[open] > summary::after { transform: rotate(225deg); margin-top: 6px; }
+.session > summary:focus-visible { outline: 1px solid var(--gold); outline-offset: 3px; border-radius: 6px; }
+.session-heading { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; }
+.session-date { color: var(--ivory); font-size: 13px; font-weight: 500; line-height: 1.4; }
+.session-meta { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.session-time { flex: none; color: var(--gold); font-family: var(--rounded); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.session-detail { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; padding: 14px; border-radius: 9px; background: rgba(7, 10, 21, 0.5); }
+.session-detail > p { color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.session-detail > .eyebrow { color: var(--gold); font-size: 9px; }
+.session-step { display: flex; align-items: baseline; gap: 12px; font-size: 13px; }
+.session-step-number { color: var(--gold); font-size: 10px; }
+.session-step-name { flex: 1; font-family: var(--hindi); font-size: 14px; }
+.session-step-time { font-variant-numeric: tabular-nums; }
 
 .calendar-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .card-title { margin: 5px 0 0; font-family: var(--serif); font-size: 21px; font-weight: 400; line-height: 1.2; }
@@ -1488,16 +1493,11 @@ button { cursor: pointer; }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-height: 62px;
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-.day-detail-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
-.day-detail-title { color: var(--ivory); font-size: 13px; font-weight: 500; }
-.day-detail-totals { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }
-.day-detail-time { color: var(--gold); }
 
 .trend-headline {
   display: flex;
@@ -1565,8 +1565,8 @@ button { cursor: pointer; }
 
 /* Smaller type and padding in a compact window, and in any arrangement but the widest. The two blocks
    say the same: one for the window, one for the journey's own width. */
-@media (max-width: 1179px), (max-height: 759px) {
-  .journey { gap: 14px; margin-top: 26px; }
+@media (max-width: 1179px), (max-height: 849px) {
+  .journey { gap: 14px; padding: 24px 20px; }
   .journey .setup-title { font-size: 28px; }
   .journey-intro { gap: 7px; }
   .journey-content { gap: 14px; }
@@ -1604,35 +1604,23 @@ button { cursor: pointer; }
   .heat-cell { height: 13px; }
   .heat-label { line-height: 13px; }
 
-  /* Medium: the calendar beside the trend, the hours of the week below. */
   .journey-grid {
-    grid-template-columns: 440px minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    grid-template-areas: "calendar trend" "rhythm rhythm";
+    grid-template-columns: 370px minmax(0, 1fr);
     gap: 14px;
   }
 }
 
-/* With the title and the backup buttons wrapped, both keep to the left. */
 @container journey (max-width: 759px) {
-  .backup { align-items: flex-start; }
-  .backup-message { text-align: left; }
+  .journey-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @container journey (max-width: 699px) {
-  .tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  .tile { grid-column: span 2; }
-  .tile:nth-child(n + 4) { grid-column: span 3; }
-}
-
-/* Narrow: one column. */
-@container journey (max-width: 719px) {
-  .journey-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "calendar" "trend" "rhythm"; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Phones: the hours of the week in finer cells, the tiles two by two. */
 @media (max-width: 759px), (max-height: 539px) {
-  .journey { min-height: 0; margin-top: 0; }
+  .journey { min-height: 0; padding: 24px 12px; }
   .heat-map { grid-template-columns: 22px repeat(24, minmax(0, 1fr)); gap: 2px; }
   .heat-cell { height: 11px; border-radius: 2px; }
   .heat-label { line-height: 11px; }
@@ -1641,15 +1629,48 @@ button { cursor: pointer; }
 }
 
 @container journey (max-width: 479px) {
-  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tile,
-  .tile:nth-child(n + 4) { grid-column: auto; }
-  .tile:last-child { grid-column: span 2; }
-}
-
-@container journey (max-width: 479px) {
   .day { height: 50px; }
   .day-cycles { bottom: 18px; }
+  .journey-top { flex-wrap: wrap; }
+  .history-actions { width: 100%; justify-content: space-between; }
+  .session > summary { gap: 8px; }
+}
+
+/* A native modal dialog keeps practice shortcuts and background controls out of the entry form. */
+.manual-dialog {
+  width: min(520px, calc(100% - 24px)); max-height: calc(100dvh - 24px); margin: auto;
+  padding: 28px; overflow: auto; color: var(--ivory); background: var(--panel);
+  border: 1px solid rgba(217, 184, 117, 0.3); border-radius: 16px; color-scheme: dark;
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.5);
+}
+.manual-dialog::backdrop { background: rgba(3, 5, 12, 0.72); backdrop-filter: blur(5px); }
+.manual-dialog form { display: flex; flex-direction: column; gap: 20px; }
+.manual-dialog .setup-title { font-size: 30px; margin-bottom: 8px; }
+.manual-note { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.manual-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 13px; }
+.manual-field input {
+  width: 100%; min-width: 0; padding: 11px 12px; border-radius: 7px;
+  color: var(--ivory); background: var(--bg); border: 1px solid rgba(245, 237, 217, 0.2);
+  font-size: 16px; font-variant-numeric: tabular-nums;
+}
+.manual-field input:focus { outline: 1px solid var(--gold); border-color: var(--gold); }
+.manual-field input[aria-invalid="true"] { border-color: var(--error); }
+.manual-cycle-row { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 16px; }
+.manual-cycle-row .manual-note { padding-bottom: 12px; }
+.manual-duration { border: 0; padding: 0; min-width: 0; }
+.manual-duration legend { padding: 0 0 10px; font-size: 13px; }
+.manual-time-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.manual-time-fields .manual-field { color: var(--muted); font-size: 12px; }
+.manual-average-panel { background: rgba(217, 184, 117, 0.06); padding: 16px; border-radius: 10px; }
+.manual-average-panel > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 8px; }
+#manual-average { color: var(--gold); font-family: var(--serif); font-size: 22px; font-variant-numeric: tabular-nums; }
+.manual-error { color: var(--error); font-size: 12px; line-height: 1.5; }
+.manual-buttons { display: flex; justify-content: flex-end; gap: 12px; }
+.session-average { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; }
+.session-average strong { color: var(--gold); font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; }
+@media (max-width: 479px) {
+  .manual-dialog { padding: 20px; }
+  .manual-buttons > button { flex: 1; padding-left: 10px; padding-right: 10px; }
 }
 
 @media (max-width: 479px) {

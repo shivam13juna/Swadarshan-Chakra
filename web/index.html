@@ -27,8 +27,7 @@
   <div class="background" aria-hidden="true"></div>
 
   <main id="app" data-phase="ready">
-    <!-- Setup and completion (MeditationView.overview). Setup scrolls down to the journey; on completion
-         the journey takes the circle's place, beside the practice's own time. -->
+    <!-- Practice and history share one scroll, with a distinct boundary below the opening section. -->
     <section id="overview" class="view overview is-visible" aria-labelledby="brand-name">
       <header class="overview-header">
         <span class="brand-mark" aria-hidden="true"><img src="images/icon.png" width="256" height="256" alt=""></span>
@@ -51,6 +50,7 @@
       </header>
 
       <div id="overview-scroll" class="overview-scroll">
+        <div class="practice-section">
         <div class="overview-body">
           <div id="orbit" class="orbit is-preview" role="group" aria-label="Five spiritual forms, in clockwise order">
             <svg class="orbit-rings" aria-hidden="true">
@@ -67,10 +67,6 @@
                 <p id="focus-context" class="focus-context" lang="hi"></p>
               </div>
             </div>
-            <!-- "Your journey", in the open space at the foot of the circle: down to the journey -->
-            <button id="journey-cue" type="button" class="journey-cue" data-action="journey" title="Your journey is below: a calendar of your days, your trend, and the hours you practice (J)">
-              Your journey<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6.5l4 4 4-4"/></svg>
-            </button>
           </div>
 
           <form id="setup" class="setup-panel" novalidate>
@@ -167,13 +163,14 @@
               </div>
               <div class="completion-buttons">
                 <button type="button" class="gold-button" data-action="practice-again">Practice again</button>
+                <button type="button" class="quiet-button" data-action="journey">View history</button>
               </div>
             </div>
             <div class="setup-rule" aria-hidden="true"></div>
             <div class="summary-intro">
               <p class="eyebrow">Your time</p>
               <h3 id="time-summary-title" class="summary-title">How you spent it.</h3>
-              <p class="summary-note">The time practiced in each step, with each cycle's total and its average per step. Pauses with a step count; the cards and time away don't.</p>
+              <p id="time-summary-note" class="summary-note"></p>
             </div>
             <div class="time-table-wrap">
               <table class="time-table" aria-labelledby="time-summary-title">
@@ -196,15 +193,31 @@
           </section>
         </div>
 
-        <!-- The journey: below setup, a scroll away; on completion, in the circle's place (JourneyView) -->
+        <footer class="overview-footer">
+          <p id="footer-shortcut" class="shortcut"><kbd>Space</kbd><span>Next step during practice</span></p>
+          <button id="journey-cue" type="button" class="journey-cue" data-action="journey" title="Scroll to your practice history (J)">
+            Scroll to your history<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6.5l4 4 4-4"/></svg>
+          </button>
+          <label id="fullscreen-setting" class="checkbox" title="Untick to practice in this window. The full-screen button or F switches at any time.">
+            <input id="opens-full-screen" type="checkbox">
+            <span>Open in full screen</span>
+          </label>
+        </footer>
+        </div>
+
+        <!-- Summary, past sessions, then patterns (JourneyView). -->
         <section id="journey" class="journey" aria-labelledby="journey-title">
           <div class="journey-top">
             <div class="journey-intro">
-              <p class="eyebrow">Your journey</p>
-              <h2 id="journey-title" class="setup-title" tabindex="-1">Turn by turn.</h2>
-              <p id="journey-subtitle" class="setup-subtitle"></p>
+              <h2 id="journey-title" class="setup-title" tabindex="-1">Your practice history</h2>
             </div>
+            <div class="history-actions">
+              <button id="add-practice" type="button" class="quiet-button" data-action="add-practice" title="Record completed cycles and time practiced elsewhere">
+                <span aria-hidden="true">＋</span> Add practice
+              </button>
             <div class="backup">
+              <details id="backup-menu" class="backup-menu">
+                <summary class="quiet-button">Backups<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6.5l4 4 4-4"/></svg></summary>
               <div class="backup-buttons">
                 <button type="button" class="quiet-button" data-action="import-backup" title="Add the practices in a backup from another device. Nothing here is replaced.">
                   <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 11.5v1.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1.5"/></svg>Import backup…
@@ -213,15 +226,18 @@
                   <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2M4.5 5.5 8 2l3.5 3.5M3 11.5v1.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1.5"/></svg>Export backup…
                 </button>
               </div>
-              <p id="backup-message" class="backup-message" role="status"></p>
+              </details>
               <input id="import-file" type="file" accept=".json,application/json" hidden>
             </div>
+            </div>
           </div>
+          <p id="journey-subtitle" class="setup-subtitle"></p>
+          <p id="backup-message" class="backup-message" role="status" hidden></p>
 
           <div id="journey-empty" class="journey-card journey-empty" hidden>
             <svg class="empty-icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="8" width="30" height="27" rx="4"/><path d="M5 15.5h30M13 4.5v7M27 4.5v7"/><circle cx="28.5" cy="28.5" r="5.5"/><path d="M28.5 26v2.7l1.8 1.2"/></svg>
             <h3 class="empty-title">Your journey begins with your first practice.</h3>
-            <p class="empty-note">Every practice of a minute or more is kept here, in this browser: a calendar of your days, how your practice is growing, and the hours you tend to practice. Practiced on another device or in the Mac app? Import its backup.</p>
+            <p class="empty-note">A minute of practice or a complete cycle is saved here. Practiced elsewhere? Choose Add practice. To bring practices from another device, choose Backups → Import backup.</p>
           </div>
 
           <div id="journey-content" class="journey-content">
@@ -229,8 +245,7 @@
               <div class="journey-card tile"><p class="label">Today</p><p id="tile-today" class="value"></p><p id="tile-today-detail" class="detail"></p></div>
               <div class="journey-card tile"><p class="label">Last 7 days</p><p id="tile-week" class="value"></p><p id="tile-week-detail" class="detail"></p></div>
               <div class="journey-card tile"><p class="label">Last 30 days</p><p id="tile-month" class="value"></p><p id="tile-month-detail" class="detail"></p></div>
-              <div class="journey-card tile"><p class="label">Streak</p><p id="tile-streak" class="value"></p><p id="tile-streak-detail" class="detail"></p></div>
-              <div class="journey-card tile" title="108 cycles make a mala, as 108 beads make a string of prayer beads"><p class="label">Cycles in all</p><p id="tile-cycles" class="value"></p><p id="tile-cycles-detail" class="detail"></p></div>
+              <div id="average-session" class="journey-card tile"><p class="label">Average session</p><p id="tile-average" class="value"></p><p id="tile-average-detail" class="detail"></p></div>
             </div>
 
             <div class="journey-grid">
@@ -255,6 +270,20 @@
                 <div id="day-detail" class="day-detail" aria-live="polite"></div>
               </section>
 
+              <section id="practice-sessions" class="journey-card sessions-card" aria-labelledby="sessions-title">
+                <div class="sessions-head">
+                  <div><p class="eyebrow">Past practices</p><h3 id="sessions-title" class="card-title" tabindex="-1">Recent sessions</h3></div>
+                  <button id="all-practice-dates" type="button" class="quiet-button" data-action="all-dates" hidden>All dates</button>
+                </div>
+                <p id="sessions-empty" class="sessions-empty" hidden></p>
+                <div id="sessions-list" class="sessions-list"></div>
+                <button id="more-practices" type="button" class="quiet-button" data-action="more-practices" hidden></button>
+                <p id="sessions-count" class="sessions-count" role="status"></p>
+              </section>
+            </div>
+
+            <div class="patterns-head"><p class="eyebrow">Your practice patterns</p><p id="history-streak"></p></div>
+            <div class="patterns">
               <section class="journey-card trend-card" aria-labelledby="trend-title">
                 <p class="eyebrow">Trend · last 12 weeks</p>
                 <h3 class="trend-headline">
@@ -277,17 +306,9 @@
               </section>
             </div>
           </div>
+          <p class="history-footer">Kept in this browser · No account · No tracking</p>
         </section>
       </div>
-
-      <footer class="overview-footer">
-        <p id="footer-shortcut" class="shortcut"><kbd>Space</kbd><span>Next step during practice</span></p>
-        <label id="fullscreen-setting" class="checkbox" title="Untick to practice in this window. The full-screen button or F switches at any time.">
-          <input id="opens-full-screen" type="checkbox">
-          <span>Open in full screen</span>
-        </label>
-        <p class="footer-tag">No account · No tracking</p>
-      </footer>
     </section>
 
     <!-- The card that opens every cycle (CycleIntroductionView) -->
@@ -405,6 +426,39 @@
       </div>
     </div>
 
+    <dialog id="manual-practice-dialog" class="manual-dialog" aria-labelledby="manual-title" aria-describedby="manual-description">
+      <form id="manual-practice-form" novalidate>
+        <div>
+          <h2 id="manual-title" class="setup-title">Add practice</h2>
+          <p id="manual-description" class="manual-note">Keep a record of the chakra you spun elsewhere.</p>
+        </div>
+        <label class="manual-field">When did you start?
+          <input id="manual-start" type="datetime-local" min="1970-01-01T00:00" required>
+        </label>
+        <div class="manual-cycle-row">
+          <label class="manual-field">Completed cycles
+            <input id="manual-cycles" type="text" inputmode="numeric" maxlength="3" value="1" required aria-describedby="manual-cycles-hint" autofocus>
+          </label>
+          <p id="manual-cycles-hint" class="manual-note">1 cycle = 5 steps</p>
+        </div>
+        <fieldset class="manual-duration">
+          <legend>Total practice time</legend>
+          <div class="manual-time-fields">
+            <label class="manual-field">Minutes<input id="manual-minutes" type="text" inputmode="numeric" maxlength="4" placeholder="0" required></label>
+            <label class="manual-field">Seconds<input id="manual-seconds" type="text" inputmode="numeric" maxlength="2" value="0" required></label>
+          </div>
+        </fieldset>
+        <div class="manual-average-panel">
+          <div><span>Average per step</span><output id="manual-average" for="manual-cycles manual-minutes manual-seconds" aria-live="polite">—</output></div>
+          <p class="manual-note">Total time ÷ (cycles × 5). Individual form times aren’t recorded.</p>
+        </div>
+        <p id="manual-error" class="manual-error" role="alert" hidden></p>
+        <div class="manual-buttons">
+          <button type="button" class="quiet-button" data-action="cancel-manual">Cancel</button>
+          <button id="save-manual-practice" type="submit" class="gold-button" disabled>Save practice</button>
+        </div>
+      </form>
+    </dialog>
     <p id="announcer" class="visually-hidden" aria-live="polite"></p>
   </main>
 </body>

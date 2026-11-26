@@ -48,7 +48,6 @@ public struct PracticeInsights: Equatable, Sendable {
     public static let weeksShown = 12
     /// The hours of the week are read from the last twelve weeks.
     public static let rhythmDays = 84
-    public static let malaCycles = 108
 
     public let today: Int
     /// 0 is Sunday.
@@ -58,6 +57,7 @@ public struct PracticeInsights: Equatable, Sendable {
     public let activeDays: Int
     public let todayTotals: Totals
     public let last7: Int
+    public let last7Practices: Int
     public let previous7: Int
     public let last30: Int
     public let previous30: Int
@@ -117,6 +117,7 @@ public struct PracticeInsights: Equatable, Sendable {
 
         func span(_ from: Int, _ to: Int) -> Int { (from...to).reduce(0) { $0 + (days[$1]?.seconds ?? 0) } }
         last7 = span(today - 6, today)
+        last7Practices = (today - 6...today).reduce(0) { $0 + (days[$1]?.practices ?? 0) }
         previous7 = span(today - 13, today - 7)
         last30 = span(today - 29, today)
         previous30 = span(today - 59, today - 30)
@@ -222,12 +223,11 @@ public struct PracticeInsights: Equatable, Sendable {
         return currentStreak >= bestStreak ? "Your longest yet" : "Best: \(HistoryText.count(bestStreak, "day"))"
     }
 
-    /// 108 cycles make a mala, as 108 beads make a string of prayer beads.
-    public var cyclesDetail: String {
-        let malas = all.cycles / Self.malaCycles
-        let toward = all.cycles % Self.malaCycles
-        guard malas > 0 else { return "\(Self.malaCycles - toward) more to a mala of 108" }
-        return "\(HistoryText.count(malas, "mala")) of 108 · \(toward) toward the next"
+    /// Every saved session begun today or in the six preceding calendar days has equal weight,
+    /// including freestyle and sessions ended early. No sessions means no average.
+    public var averageSessionSeconds: Int? {
+        guard last7Practices > 0 else { return nil }
+        return Int((Double(last7) / Double(last7Practices)).rounded())
     }
 
     public var trendTitle: String {

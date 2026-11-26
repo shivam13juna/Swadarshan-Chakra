@@ -121,7 +121,7 @@ const isCount = (value, high) => Number.isInteger(value) && value >= 0 && value 
 
 /// One practice, as kept in the history and written to backups: { id, start, seconds, cycles, planned,
 /// timing, steps, device, time }, `time` being the parsed start. Null when any field is wrong.
-export function makeRecord({ id, start, seconds, cycles, planned, timing, steps = null, device = null }) {
+export function makeRecord({ id, start, seconds, cycles, planned, timing, steps = null, device = null, manual = false }) {
   const time = parsePracticeTime(start);
   if (typeof id !== "string" || id.length < 1 || id.length > 100 || !time || !isCount(seconds, MAXIMUM_SECONDS)
       || !Number.isInteger(planned) || planned < MINIMUM_CYCLES || planned > MAXIMUM_CYCLES
@@ -129,8 +129,17 @@ export function makeRecord({ id, start, seconds, cycles, planned, timing, steps 
   if (steps != null && (!Array.isArray(steps) || steps.length !== STAGES.length
       || !steps.every((value) => isCount(value, MAXIMUM_SECONDS)))) return null;
   if (device != null && (typeof device !== "string" || device.length < 1 || device.length > 40)) return null;
-  return Object.freeze({ id, start, seconds, cycles, planned, timing, steps: steps && Object.freeze([...steps]), device, time });
+  if (typeof manual !== "boolean" || (manual && (cycles !== planned || seconds < 1 || seconds > 86400 || steps != null))) return null;
+  return Object.freeze({ id, start, seconds, cycles, planned, timing, steps: steps && Object.freeze([...steps]), device, manual, time });
 }
+
+/// A completed practice elsewhere. Only its aggregate time is known; individual form times are not.
+/// Freestyle keeps version-one backups compatible: no app timer was used for this session.
+export function manuallyAddedRecord(id, start, seconds, cycles) {
+  return makeRecord({ id, start, seconds, cycles, planned: cycles, timing: FREESTYLE, manual: true });
+}
+
+export const averageSecondsPerStep = record => record.manual && record.cycles > 0 ? record.seconds / (record.cycles * STAGES.length) : null;
 
 /// The practice under way or just ended, as the engine has counted it.
 export function recordFromEngine(id, start, engine, device) {
@@ -166,7 +175,8 @@ export function recordFromJSON(value) {
     if (typeof value.device !== "string") return null;
     device = value.device;
   }
-  return makeRecord({ id: value.id, start: value.start, seconds, cycles, planned, timing: value.timing, steps, device });
+  if ("manual" in value && typeof value.manual !== "boolean") return null;
+  return makeRecord({ id: value.id, start: value.start, seconds, cycles, planned, timing: value.timing, steps, device, manual: value.manual ?? false });
 }
 
 /// One line of JSON, its fields in a fixed order.
@@ -175,6 +185,7 @@ export function recordJSON(record) {
     planned: record.planned, timing: record.timing };
   if (record.steps) fields.steps = record.steps;
   if (record.device != null) fields.device = record.device;
+  if (record.manual) fields.manual = true;
   return JSON.stringify(fields);
 }
 
@@ -343,7 +354,6 @@ export class PracticeInsights {
   static weeksShown = 12;
   /// The hours of the week are read from the last twelve weeks.
   static rhythmDays = 84;
-  static malaCycles = 108;
 
   constructor(history, today, firstWeekday) {
     this.today = today;
@@ -389,6 +399,8 @@ export class PracticeInsights {
       return sum;
     };
     this.last7 = span(today - 6, today);
+    this.last7Practices = Array.from({ length: 7 }, (_, offset) => days.get(today - offset)?.practices ?? 0)
+      .reduce((sum, count) => sum + count, 0);
     this.previous7 = span(today - 13, today - 7);
     this.last30 = span(today - 29, today);
     this.previous30 = span(today - 59, today - 30);
@@ -495,12 +507,10 @@ export class PracticeInsights {
     return this.currentStreak >= this.bestStreak ? "Your longest yet" : `Best: ${HistoryText.count(this.bestStreak, "day")}`;
   }
 
-  /// 108 cycles make a mala, as 108 beads make a string of prayer beads.
-  get cyclesDetail() {
-    const malas = div(this.all.cycles, PracticeInsights.malaCycles);
-    const toward = this.all.cycles % PracticeInsights.malaCycles;
-    if (malas === 0) return `${PracticeInsights.malaCycles - toward} more to a mala of 108`;
-    return `${HistoryText.count(malas, "mala")} of 108 · ${toward} toward the next`;
+  /// Every saved session begun today or in the six preceding calendar days has equal weight,
+  /// including freestyle and sessions ended early. No sessions means no average.
+  get averageSessionSeconds() {
+    return this.last7Practices > 0 ? Math.round(this.last7 / this.last7Practices) : null;
   }
 
   get trendTitle() {

@@ -3,29 +3,29 @@ import MeditationCore
 
 /// The journey: every practice kept on this Mac, as totals, a calendar of days, the trend over recent
 /// weeks, and the hours of the week the practitioner tends to practice; with a backup to carry it all to
-/// another Mac or the web. It lies below setup, a scroll away, and beside a finished practice's time.
+/// another Mac or the web. It follows practice in the same scroll, with its own section boundary.
 struct JourneyView: View {
     @ObservedObject var model: SessionModel
-    /// The width it's laid out in: the window's, up to 1480, below setup; the column beside the time on completion.
+    /// The available width inside the history section.
     let width: CGFloat
     /// The window's compact sizes.
     let compact: Bool
     @State private var month: CivilDate?
     @State private var selectedDay: Int?
+    @State private var expandedPractice: String?
+    @State private var visiblePractices = 5
 
-    /// Wide: the calendar beside the trend and, under it, the hours of the week. Medium: the calendar
-    /// beside the trend, the hours of the week below. Narrow: one column. The web version arranges
-    /// itself at the same widths.
+    /// The calendar and sessions share a row from 760 points; patterns always follow below.
     enum Arrangement { case wide, medium, narrow }
     static func arrangement(for width: CGFloat) -> Arrangement {
-        width >= 1150 ? .wide : (width >= 720 ? .medium : .narrow)
+        width >= 1150 ? .wide : (width >= 760 ? .medium : .narrow)
     }
     private var arrangement: Arrangement { Self.arrangement(for: width) }
     /// Smaller type and padding in a compact window, and in any arrangement but the widest.
     private var dense: Bool { compact || arrangement != .wide }
     private var cardPadding: CGFloat { dense ? 16 : 20 }
     private var gap: CGFloat { dense ? 14 : 16 }
-    private var calendarWidth: CGFloat { arrangement == .wide ? 460 : 440 }
+    private var calendarWidth: CGFloat { arrangement == .wide ? 440 : 370 }
 
     var body: some View {
         let insights = model.insights
@@ -35,92 +35,98 @@ struct JourneyView: View {
                 emptyCard
             } else {
                 tiles(insights)
-                switch arrangement {
-                case .wide:
-                    // The trend takes whatever height the calendar leaves it.
+                if arrangement != .narrow {
                     HStack(alignment: .top, spacing: gap) {
                         calendarCard(insights).frame(width: calendarWidth)
-                        VStack(spacing: gap) {
-                            trendCard(insights)
-                            rhythmCard(insights, cardWidth: width - calendarWidth - gap)
-                        }
-                        .frame(maxWidth: .infinity)
+                        sessionsCard.frame(maxWidth: .infinity)
                     }
-                    .fixedSize(horizontal: false, vertical: true)
-                case .medium:
-                    HStack(alignment: .top, spacing: gap) {
-                        calendarCard(insights).frame(width: calendarWidth)
-                        trendCard(insights).frame(maxWidth: .infinity)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    rhythmCard(insights, cardWidth: width)
-                case .narrow:
+                } else {
                     calendarCard(insights)
-                    trendCard(insights)
-                    rhythmCard(insights, cardWidth: width)
+                    sessionsCard
                 }
+                HStack {
+                    Text("YOUR PRACTICE PATTERNS").font(.system(size: 10, weight: .medium)).tracking(1.5)
+                    Spacer()
+                    Text("Current streak: \(insights.streakValue) · Best: \(HistoryText.count(insights.bestStreak, "day"))")
+                        .font(.system(size: 12))
+                }
+                .foregroundColor(Palette.muted).padding(.top, 18)
+                trendCard(insights)
+                rhythmCard(insights, cardWidth: width)
             }
+            Text("ON THIS MAC · ALWAYS OFFLINE")
+                .font(.system(size: 9, weight: .medium)).tracking(1.6).foregroundColor(Palette.muted)
+                .padding(.top, 12)
         }
         .frame(maxWidth: width, alignment: .topLeading)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Your journey")
+        .accessibilityLabel("Your practice history")
         .accessibilityIdentifier("journey")
+        .sheet(isPresented: $model.addingPractice) {
+            ManualPracticeView(model: model) { record in
+                month = CivilDate(dayNumber: record.day)
+                selectDay(record.day)
+                let records = Array(model.history.records(on: record.day).reversed())
+                visiblePractices = max(5, (records.firstIndex(where: { $0.id == record.id }) ?? 0) + 1)
+                expandedPractice = record.id
+            }
+        }
     }
 
     // MARK: Title and backup
 
-    /// The title beside the backup buttons, or above them when the two don't fit side by side.
+    /// A clear section title and a compact backup menu, with lifetime totals beneath.
     private func titleRow(_ insights: PracticeInsights) -> some View {
-        let intro = VStack(alignment: .leading, spacing: dense ? 7 : 10) {
-            Eyebrow(text: "YOUR JOURNEY")
-            Text("Turn by turn.")
-                .font(.system(size: dense ? 28 : 35, weight: .regular, design: .serif))
-                .foregroundColor(Palette.ivory)
-            Text(subtitle(insights)).font(.system(size: 13)).foregroundColor(Palette.muted)
-        }
-        return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .bottom, spacing: 20) {
-                intro.fixedSize()
-                Spacer(minLength: 12)
-                backup(alignment: .trailing)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 20) {
+                Text("Your practice history")
+                    .font(.system(size: dense ? 28 : 35, weight: .regular, design: .serif))
+                    .foregroundColor(Palette.ivory)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                HStack(spacing: 16) {
+                    Button { model.addingPractice = true } label: { Label("Add practice", systemImage: "plus") }
+                        .buttonStyle(QuietButtonStyle()).fixedSize()
+                        .help("Record completed cycles and time practiced elsewhere")
+                        .accessibilityIdentifier("add-practice")
+                    backup
+                }
             }
-            VStack(alignment: .leading, spacing: 14) {
-                intro
-                backup(alignment: .leading)
+            Text(subtitle(insights)).font(.system(size: 13)).foregroundColor(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            if let message = model.backupMessage {
+                Text(message).font(.system(size: 12)).foregroundColor(Palette.gold)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("backup-message")
             }
         }
     }
 
-    private func backup(alignment: HorizontalAlignment) -> some View {
-        VStack(alignment: alignment, spacing: 8) {
-            HStack(spacing: 10) {
-                Button(action: model.importHistory) {
-                    Label("Import backup…", systemImage: "square.and.arrow.down")
-                }
-                .buttonStyle(QuietButtonStyle())
-                .help("Add the practices in a backup from another Mac or the web. Nothing here is replaced.")
-                .accessibilityIdentifier("import-backup")
-                Button(action: model.exportHistory) {
-                    Label("Export backup…", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(QuietButtonStyle())
-                .disabled(model.history.isEmpty)
-                .opacity(model.history.isEmpty ? 0.45 : 1)
-                .help("Save every practice to a file you can import on another Mac or on the web")
-                .accessibilityIdentifier("export-backup")
+    private var backup: some View {
+        Menu {
+            Button(action: model.importHistory) {
+                Label("Import backup…", systemImage: "square.and.arrow.down")
             }
-            Text(model.backupMessage ?? "Kept on this Mac. A backup carries it to another Mac or the web.")
-                .font(.system(size: 11)).foregroundColor(model.backupMessage == nil ? Palette.muted : Palette.gold)
-                .multilineTextAlignment(alignment == .leading ? .leading : .trailing)
-                .frame(maxWidth: 430, alignment: alignment == .leading ? .leading : .trailing)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("backup-message")
+            .help("Add the practices in a backup from another Mac or the web. Nothing here is replaced.")
+            .accessibilityIdentifier("import-backup")
+            Button(action: model.exportHistory) {
+                Label("Export backup…", systemImage: "square.and.arrow.up")
+            }
+            .disabled(model.history.isEmpty)
+            .help("Save every practice to a file you can import on another Mac or on the web")
+            .accessibilityIdentifier("export-backup")
+        } label: {
+            Label("Backups", systemImage: "externaldrive")
         }
+        .menuStyle(.borderlessButton).fixedSize()
+        .foregroundColor(Palette.muted)
+        .help("Import or export your practice history")
+        .accessibilityIdentifier("history-backups")
     }
 
     private func subtitle(_ insights: PracticeInsights) -> String {
         guard let first = insights.firstDay else { return "Nothing kept yet." }
-        return "\(HistoryText.count(insights.all.practices, "practice")) since \(HistoryText.date(first)) · \(HistoryText.minutes(insights.all.seconds)) in all"
+        return "\(HistoryText.count(insights.all.practices, "practice")) · \(HistoryText.minutes(insights.all.seconds)) · \(HistoryText.count(insights.all.cycles, "cycle")) since \(HistoryText.date(first))"
     }
 
     private var emptyCard: some View {
@@ -130,7 +136,7 @@ struct JourneyView: View {
             Text("Your journey begins with your first practice.")
                 .font(.system(size: dense ? 22 : 26, weight: .regular, design: .serif)).foregroundColor(Palette.ivory)
                 .multilineTextAlignment(.center)
-            Text("Every practice of a minute or more is kept here, on this Mac: a calendar of your days, how your practice is growing, and the hours you tend to practice. Practiced on another Mac or on the web? Import its backup.")
+            Text("A minute of practice or a complete cycle is saved here. Practiced elsewhere? Choose Add practice. To bring practices from another device, choose Backups → Import backup.")
                 .font(.system(size: 13)).foregroundColor(Palette.muted).multilineTextAlignment(.center)
                 .lineSpacing(3).frame(maxWidth: 520).fixedSize(horizontal: false, vertical: true)
         }
@@ -149,19 +155,18 @@ struct JourneyView: View {
                             detail: insights.weekComparison.text, direction: insights.weekComparison.direction, compact: dense)
         let month = StatTile(title: "LAST 30 DAYS", value: HistoryText.minutes(insights.last30),
                              detail: insights.monthComparison.text, direction: insights.monthComparison.direction, compact: dense)
-        let streak = StatTile(title: "STREAK", value: insights.streakValue, detail: insights.streakDetail,
-                              direction: nil, compact: dense)
-        let cycles = StatTile(title: "CYCLES IN ALL", value: "\(insights.all.cycles)", detail: insights.cyclesDetail,
-                              direction: nil, compact: dense, valueColor: Palette.cycles)
-            .help("108 cycles make a mala, as 108 beads make a string of prayer beads")
-        // Five in a row, or three and two where five won't fit. Tiles in a row share its height.
+        let average = StatTile(title: "AVERAGE SESSION", value: insights.averageSessionSeconds.map(HistoryText.minutes) ?? "—",
+                               detail: "Per session · last 7 days", direction: nil, compact: dense)
+            .help("Total practice time divided by all \(insights.last7Practices) saved sessions in the last 7 days, including today")
+            .accessibilityIdentifier("average-session")
+        // Four in a row, or two by two. Each session contributes once to the average.
         if width < 700 {
             VStack(spacing: 10) {
-                HStack(spacing: 10) { today; week; month }.fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) { streak; cycles }.fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) { today; week }.fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) { month; average }.fixedSize(horizontal: false, vertical: true)
             }
         } else {
-            HStack(spacing: dense ? 10 : 14) { today; week; month; streak; cycles }
+            HStack(spacing: dense ? 10 : 14) { today; week; month; average }
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -183,7 +188,6 @@ struct JourneyView: View {
         let current = CivilDate(dayNumber: today)
         let canGoBack = (shown.year, shown.month) > (earliest.year, earliest.month)
         let canGoForward = (shown.year, shown.month) < (current.year, current.month)
-        let selected = selectedDay ?? today
         let cellHeight: CGFloat = dense ? 38 : 40
 
         return VStack(alignment: .leading, spacing: dense ? 10 : 12) {
@@ -211,7 +215,7 @@ struct JourneyView: View {
                     HStack(spacing: 5) {
                         ForEach(0..<7, id: \.self) { column in
                             if let day = cells[row * 7 + column] {
-                                dayCell(day, insights: insights, selected: day == selected, height: cellHeight)
+                                dayCell(day, insights: insights, selected: day == selectedDay, height: cellHeight)
                             } else {
                                 Color.clear.frame(maxWidth: .infinity).frame(height: cellHeight)
                             }
@@ -220,9 +224,14 @@ struct JourneyView: View {
                 }
             }
             Rectangle().fill(Palette.gold.opacity(0.14)).frame(height: 0.7)
-            dayDetail(selected, insights: insights)
+            if let selectedDay {
+                Text(Journey.dayLabel(selectedDay, insights.totals(on: selectedDay)))
+                    .font(.system(size: 12)).foregroundColor(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Select a day to see its sessions.").font(.system(size: 12)).foregroundColor(Palette.muted)
+            }
         }
-        .frame(maxHeight: .infinity, alignment: .top)
         .journeyCard(padding: cardPadding)
     }
 
@@ -233,7 +242,7 @@ struct JourneyView: View {
         let future = day > insights.today
         let dark = level >= 3
         return Button {
-            selectedDay = day
+            selectDay(day)
         } label: {
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 7).fill(Journey.heatColor(level))
@@ -269,38 +278,120 @@ struct JourneyView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func dayDetail(_ day: Int, insights: PracticeInsights) -> some View {
-        let totals = insights.totals(on: day)
-        let records = model.history.records(on: day)
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(HistoryText.dayTitle(day)).font(.system(size: 13, weight: .medium)).foregroundColor(Palette.ivory)
-                if totals.practices > 0 {
-                    HStack(alignment: .firstTextBaseline, spacing: 5) {
-                        Text(HistoryText.minutes(totals.seconds)).foregroundColor(Palette.gold)
-                        Text("·").foregroundColor(Palette.muted)
-                        CycleCount(cycles: totals.cycles, size: 12, unit: true).foregroundColor(Palette.cycles)
-                        Text("·").foregroundColor(Palette.muted)
-                        Text(HistoryText.count(totals.practices, "practice")).foregroundColor(Palette.muted)
-                    }
-                    .font(.system(size: 12))
+    // MARK: Past sessions
+
+    private var sessionsCard: some View {
+        let records = Array((selectedDay.map { model.history.records(on: $0) } ?? model.history.records).reversed())
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Eyebrow(text: "PAST PRACTICES")
+                    Text(selectedDay.map(HistoryText.dayTitle) ?? "Recent sessions")
+                        .font(.system(size: dense ? 19 : 21, weight: .regular, design: .serif))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                if selectedDay != nil {
+                    Button("All dates") { month = nil; selectDay(nil) }
+                        .buttonStyle(QuietButtonStyle()).accessibilityIdentifier("all-practice-dates")
                 }
             }
             if records.isEmpty {
-                Text(day == insights.today ? "No practice yet today." : "No practice on this day.")
-                    .font(.system(size: 12)).foregroundColor(Palette.muted)
+                Text(selectedDay == model.insights.today ? "No practice yet today." : "No practice on this day.")
+                    .font(.system(size: 13)).foregroundColor(Palette.muted)
+                    .frame(maxWidth: .infinity, minHeight: 130, alignment: .center)
             } else {
-                ForEach(records.prefix(3), id: \.id) { record in
-                    Text(Journey.line(record)).font(.system(size: 12)).monospacedDigit().foregroundColor(Palette.muted)
+                VStack(spacing: 0) {
+                    ForEach(records.prefix(visiblePractices), id: \.id) { record in
+                        sessionRow(record)
+                    }
                 }
-                if records.count > 3 {
-                    Text("and \(records.count - 3) more").font(.system(size: 12)).foregroundColor(Palette.muted)
+                if records.count > visiblePractices {
+                    Button("Show more sessions (\(records.count - visiblePractices) remaining)") { visiblePractices += 5 }
+                        .buttonStyle(QuietButtonStyle()).accessibilityIdentifier("more-practices")
                 }
+                Text("\(min(records.count, visiblePractices)) of \(HistoryText.count(records.count, "session")) · Most recent first")
+                    .font(.system(size: 11)).foregroundColor(Palette.muted)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 62, alignment: .topLeading)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("day-detail")
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .journeyCard(padding: cardPadding)
+        .accessibilityIdentifier("practice-sessions")
+    }
+
+    private func sessionRow(_ record: PracticeRecord) -> some View {
+        let expanded = expandedPractice == record.id
+        return VStack(alignment: .leading, spacing: 0) {
+            Rectangle().fill(Palette.ivory.opacity(0.09)).frame(height: 0.7)
+            Button {
+                expandedPractice = expanded ? nil : record.id
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(HistoryText.date(record.day)) · \(HistoryText.time(hour: record.start.hour, minute: record.start.minute))")
+                            .font(.system(size: 13, weight: .medium)).foregroundColor(Palette.ivory)
+                        Text("\(record.completed ? HistoryText.count(record.cycles, "cycle") : "\(record.cycles) of \(record.planned) cycles") · \(record.manual ? "Added manually" : record.timing.title)")
+                            .font(.system(size: 12)).foregroundColor(Palette.muted)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Text(HistoryText.minutes(record.seconds)).font(.system(size: 15, weight: .medium))
+                        .monospacedDigit().foregroundColor(Palette.gold).fixedSize()
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10)).foregroundColor(Palette.muted)
+                }
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(HistoryText.date(record.day)), \(Journey.line(record))")
+            .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+            .accessibilityHint(record.manual ? "Show average time per step" : "Show the time spent in each form")
+            .accessibilityIdentifier("practice-\(record.id)")
+            if expanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(record.completed ? "Completed" : "Ended early")
+                        .font(.system(size: 12, weight: .medium)).foregroundColor(Palette.muted)
+                    if let steps = record.steps {
+                        Eyebrow(text: "TIME BY FORM · ALL CYCLES")
+                        ForEach(Stage.all) { stage in
+                            HStack(spacing: 12) {
+                                Text(String(format: "%02d", stage.id)).font(.system(size: 10)).foregroundColor(Palette.gold)
+                                Text(stage.title).font(Palette.hindi(14)).foregroundColor(Palette.ivory)
+                                Spacer(minLength: 0)
+                                Text(TimeText.elapsed(Double(steps[stage.id - 1])))
+                                    .font(.system(size: 13)).monospacedDigit().foregroundColor(Palette.ivory)
+                            }
+                        }
+                    } else if let average = record.averageSecondsPerStep {
+                        HStack {
+                            Text("Average per step").font(.system(size: 13))
+                            Spacer()
+                            Text(average < 1 ? "<1 sec" : TimeText.elapsed(average.rounded()))
+                                .font(.system(size: 16, weight: .medium)).monospacedDigit().foregroundColor(Palette.gold)
+                        }
+                        Text("\(TimeText.elapsed(Double(record.seconds))) ÷ (\(record.cycles) × 5 steps). Individual form times weren’t recorded.")
+                            .font(.system(size: 12)).foregroundColor(Palette.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("Time by form wasn’t saved for this practice.").font(.system(size: 13)).foregroundColor(Palette.muted)
+                    }
+                    if let device = record.device {
+                        Text("Practiced on \(device == "mac" ? "Mac" : (device == "web" ? "Web" : device))")
+                            .font(.system(size: 11)).foregroundColor(Palette.muted)
+                    }
+                }
+                .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Palette.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 9))
+                .padding(.bottom, 14)
+            }
+        }
+    }
+
+    private func selectDay(_ day: Int?) {
+        selectedDay = day
+        visiblePractices = 5
+        expandedPractice = nil
     }
 
     private func monthButton(_ symbol: String, _ label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -318,18 +409,18 @@ struct JourneyView: View {
         .accessibilityLabel(label)
     }
 
-    /// Another month: today stays selected in this one; in another, its last day with practice, or its first.
+    /// In the current month show recent sessions; in another, pick its last day with practice, or its first.
     private func step(_ shown: CivilDate, by months: Int) {
         let index = shown.year * 12 + shown.month - 1 + months
         guard let next = CivilDate(year: index / 12, month: index % 12 + 1, day: 1) else { return }
         month = next
         let today = CivilDate(dayNumber: model.insights.today)
         if today.year == next.year && today.month == next.month {
-            selectedDay = nil
+            selectDay(nil)
         } else {
             let first = next.dayNumber
-            selectedDay = (0..<CivilDate.days(inMonth: next.month, year: next.year)).map { first + $0 }
-                .last { model.insights.totals(on: $0).practices > 0 } ?? first
+            selectDay((0..<CivilDate.days(inMonth: next.month, year: next.year)).map { first + $0 }
+                .last { model.insights.totals(on: $0).practices > 0 } ?? first)
         }
     }
 
@@ -471,7 +562,7 @@ private struct StatTile: View {
                 }
                 Text(detail).lineLimit(2).fixedSize(horizontal: false, vertical: true)
             }
-            .font(.system(size: 11))
+            .font(.system(size: 12))
             .foregroundColor(direction == .up ? Palette.gold : Palette.muted)
         }
         .frame(maxWidth: .infinity, minHeight: compact ? 70 : 80, maxHeight: .infinity, alignment: .topLeading)
@@ -540,7 +631,8 @@ enum Journey {
         var parts = [HistoryText.time(hour: record.start.hour, minute: record.start.minute),
                      HistoryText.minutes(record.seconds),
                      record.completed ? HistoryText.count(record.cycles, "cycle") : "\(record.cycles) of \(record.planned) cycles"]
-        if record.timing == .freestyle { parts.append("freestyle") }
+        if record.manual { parts.append("added manually") }
+        else if record.timing == .freestyle { parts.append("freestyle") }
         if let device = record.device { parts.append(device == "web" ? "Web" : (device == "mac" ? "Mac" : device)) }
         return parts.joined(separator: " · ")
     }

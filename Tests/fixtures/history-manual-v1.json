@@ -1,0 +1,12 @@
+{
+  "format": "swadarshan-chakra-history",
+  "version": 1,
+  "app": "Swadarshan Chakra",
+  "practices": [
+    {"id":"manual-new","start":"2026-11-18T06:00:00+05:30","seconds":600,"cycles":3,"planned":3,"timing":"freestyle","manual":true},
+    {"id":"manual-old","start":"2026-11-11T06:00:00+05:30","seconds":1800,"cycles":1,"planned":1,"timing":"freestyle","manual":true},
+    {"id":"invalid-boolean","start":"2026-11-18T06:00:00+05:30","seconds":600,"cycles":3,"planned":3,"timing":"freestyle","manual":1},
+    {"id":"incomplete-cycles","start":"2026-11-18T06:00:00+05:30","seconds":600,"cycles":0,"planned":3,"timing":"freestyle","manual":true},
+    {"id":"invented-steps","start":"2026-11-18T06:00:00+05:30","seconds":600,"cycles":3,"planned":3,"timing":"freestyle","steps":[120,120,120,120,120],"manual":true}
+  ]
+}

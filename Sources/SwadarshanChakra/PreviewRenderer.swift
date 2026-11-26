@@ -29,14 +29,16 @@ enum PreviewRenderer {
                     ("summary", 1440, 900), ("compact-summary", 1024, 640),
                     ("medium-summary", 1280, 800), ("wide-summary", 2560, 1440),
                     ("journey", 1440, 900), ("compact-journey", 1024, 640), ("wide-journey", 2560, 1440),
-                    ("journey-empty", 1440, 900), ("ready-empty", 1440, 900)
+                    ("journey-empty", 1440, 900), ("ready-empty", 1440, 900), ("manual-practice", 520, 560)
                 ]
                 // The sample the captures show, as the app would export it: the web version imports it too.
                 try sampleHistory.document(exported: PracticeTime(sampleNow))
                     .write(to: output.appendingPathComponent("sample-backup.json"))
                 for (name, width, height) in scenarios {
                     let model = makeModel(name)
-                    let root = MeditationView(model: model, artwork: artwork)
+                    let root = name == "manual-practice"
+                        ? AnyView(ManualPracticeView(model: model, onSave: { _ in }).frame(width: width, height: height).background(Palette.panel))
+                        : AnyView(MeditationView(model: model, artwork: artwork))
                     let host = NSHostingView(rootView: root)
                     let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: width, height: height),
                                           styleMask: .borderless, backing: .buffered, defer: false)
@@ -49,7 +51,7 @@ enum PreviewRenderer {
                     let settle: UInt64 = name == "turning-hand" ? 1_200 : (Self.turns[name] == nil ? 350 : 2_600)
                     try await Task.sleep(nanoseconds: settle * 1_000_000)
                     guard host.bounds.size == NSSize(width: width, height: height) else {
-                        throw NSError(domain: "Preview", code: 1, userInfo: [NSLocalizedDescriptionKey: "Layout exceeded the requested display size for \(name)"])
+                        throw NSError(domain: "Preview", code: 1, userInfo: [NSLocalizedDescriptionKey: "Layout exceeded the requested display size for \(name): \(host.bounds.size), expected \(width) × \(height)"])
                     }
                     guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
                         throw CocoaError(.fileWriteUnknown)

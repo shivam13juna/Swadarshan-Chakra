@@ -41,37 +41,14 @@ struct MeditationView: View {
 
     private var overview: some View {
         GeometryReader { geometry in
-            let compact = geometry.size.height < 760 || geometry.size.width < 1180
+            let compact = geometry.size.height < 850 || geometry.size.width < 1180
             let horizontalPadding: CGFloat = compact ? 26 : 46
             let width = geometry.size.width - 2 * horizontalPadding
             ZStack {
                 MeditationBackground()
                 VStack(spacing: compact ? 13 : 23) {
                     header(compact: compact)
-                    if model.engine.phase == .ready {
-                        setup(compact: compact, width: width)
-                    } else {
-                        // Wide enough on a large display for every column title to fit on one line.
-                        completion(compact: compact, width: width,
-                                   panelWidth: compact ? 372 : min(560, max(470, geometry.size.width * 0.36)))
-                    }
-                    HStack {
-                        if model.engine.phase == .ready {
-                            Shortcut(key: "Space", action: "Next step during practice")
-                        } else {
-                            Shortcut(key: "Return", action: "Practice again")
-                        }
-                        Spacer()
-                        Toggle(isOn: $model.opensInFullScreen) {
-                            Text("Open in full screen").font(.system(size: 11)).foregroundColor(Palette.muted)
-                        }
-                        .toggleStyle(.checkbox).controlSize(.small).tint(Palette.gold)
-                        .help("Untick to open meditation in an ordinary window. The green window button or ⌃⌘F switches at any time.")
-                        .accessibilityIdentifier("open-in-full-screen")
-                        .padding(.trailing, 22)
-                        Text("ON THIS MAC · ALWAYS OFFLINE")
-                            .font(.system(size: 9, weight: .medium)).tracking(1.6).foregroundColor(Palette.muted)
-                    }.frame(height: 25)
+                    scrollingOverview(compact: compact, width: width)
                 }
                 .padding(.horizontal, horizontalPadding)
                 .padding(.top, max(compact ? 20 : 30, topInset + 10))
@@ -80,28 +57,42 @@ struct MeditationView: View {
         }
     }
 
-    /// Setup fills the window: the five forms in their circle beside the practice panel. The journey
-    /// lies below, a scroll away; the header's Today and the word under the circle lead down to it.
-    private func setup(compact: Bool, width: CGFloat) -> some View {
+    /// One continuous scroll, with a deliberate boundary between practice and history. At ordinary
+    /// window sizes the history heading is visible at the foot of the opening screen.
+    private func scrollingOverview(compact: Bool, width: CGFloat) -> some View {
         GeometryReader { scroll in
+            let practiceHeight = max(compact ? 500 : 580, scroll.size.height - (compact ? 154 : 164))
+            let historyPadding: CGFloat = compact ? 20 : 28
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     VStack(spacing: 0) {
-                        HStack(spacing: compact ? 22 : 40) {
-                            OrbitView(model: model, artwork: artwork)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .overlay(alignment: .bottom) { journeyCue }
-                            SetupPanel(model: model, compact: compact)
-                                .frame(width: compact ? 286 : 326)
+                        VStack(spacing: compact ? 14 : 22) {
+                            if model.engine.phase == .ready {
+                                HStack(spacing: compact ? 22 : 40) {
+                                    OrbitView(model: model, artwork: artwork)
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    SetupPanel(model: model, compact: compact)
+                                        .frame(width: compact ? 286 : 326)
+                                }
+                                .frame(minHeight: practiceHeight)
+                            } else {
+                                TimeSummaryPanel(model: model, compact: compact)
+                                    .frame(width: min(width, 900), height: practiceHeight)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            practiceFooter
                         }
-                        .frame(height: scroll.size.height)
-                        // A page of its own once scrolled to, however little it holds.
-                        JourneyView(model: model, width: min(width, 1480), compact: compact)
-                            .frame(maxWidth: .infinity)
-                            .padding(.bottom, 4)
-                            .frame(minHeight: scroll.size.height, alignment: .top)
+                        .padding(.bottom, compact ? 24 : 32)
+                        JourneyView(model: model, width: min(width - historyPadding * 2, 1424), compact: compact)
+                            .padding(.horizontal, historyPadding)
+                            .padding(.vertical, compact ? 24 : 28)
+                            .frame(maxWidth: .infinity, minHeight: scroll.size.height, alignment: .top)
+                            .background(LinearGradient(colors: [Palette.panel.opacity(0.72), Palette.panel.opacity(0.22)],
+                                                       startPoint: .top, endPoint: .bottom))
+                            .overlay(alignment: .top) {
+                                Rectangle().fill(Palette.gold.opacity(0.35)).frame(height: 1)
+                            }
                             .id(Self.journeyAnchor)
-                            .padding(.top, compact ? 26 : 34)
                     }
                 }
                 .scrollIndicators(.automatic)
@@ -111,35 +102,32 @@ struct MeditationView: View {
         }
     }
 
-    /// Completion: in place of the circle, the journey, this practice in it; beside it, the practice's
-    /// own time. The journey scrolls on its own; the time stays in view.
-    private func completion(compact: Bool, width: CGFloat, panelWidth: CGFloat) -> some View {
-        let spacing: CGFloat = compact ? 22 : 40
-        // On the largest displays the two stay together, centred.
-        let column = min(1480, max(320, width - panelWidth - spacing))
-        return HStack(alignment: .top, spacing: spacing) {
-            ScrollViewReader { proxy in
-                ScrollView(.vertical) {
-                    JourneyView(model: model, width: column, compact: compact)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .padding(.bottom, 4)
-                        .id(Self.journeyAnchor)
-                }
-                .scrollIndicators(.automatic)
-                .onChange(of: model.journeyRequested) { _ in showJourneyIfAsked(proxy, animated: true) }
+    /// These controls belong to practice and scroll out of view when history is being read.
+    private var practiceFooter: some View {
+        HStack {
+            if model.engine.phase == .ready {
+                Shortcut(key: "Space", action: "Next step during practice")
+            } else {
+                Shortcut(key: "Return", action: "Practice again")
             }
-            .frame(width: column)
-            TimeSummaryPanel(model: model, compact: compact)
-                .frame(width: panelWidth)
+            Spacer()
+            journeyCue
+            Spacer()
+            Toggle(isOn: $model.opensInFullScreen) {
+                Text("Open in full screen").font(.system(size: 11)).foregroundColor(Palette.muted)
+            }
+            .toggleStyle(.checkbox).controlSize(.small).tint(Palette.gold)
+            .help("Untick to open meditation in an ordinary window. The green window button or ⌃⌘F switches at any time.")
+            .accessibilityIdentifier("open-in-full-screen")
         }
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(height: 25)
     }
 
-    /// "Your journey ⌄", in the open space at the foot of the circle: down to the journey.
+    /// An optional shortcut to the history below; scrolling follows the same path.
     private var journeyCue: some View {
         Button(action: model.showJourney) {
             HStack(spacing: 6) {
-                Text("YOUR JOURNEY").font(.system(size: 9, weight: .medium)).tracking(2)
+                Text("SCROLL TO YOUR HISTORY").font(.system(size: 9, weight: .medium)).tracking(1.6)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
             }
             .foregroundColor(Palette.muted)

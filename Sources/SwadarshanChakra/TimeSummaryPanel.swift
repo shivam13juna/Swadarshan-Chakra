@@ -1,10 +1,10 @@
 import SwiftUI
 import MeditationCore
 
-/// The finished practice, beside the journey on the completion screen: that it's complete, its time
+/// The finished practice, above history on the completion screen: that it's complete, its time
 /// against the plan, and the way on; then how its time was spent: for each cycle, the time practiced in
 /// each of its five steps, the average per step, and the cycle's total, then all cycles together.
-/// Practiced time includes pauses spent with a step; the cards and time away never count.
+/// Timed practice includes pauses with a step; freestyle excludes all pauses.
 struct TimeSummaryPanel: View {
     @ObservedObject var model: SessionModel
     let compact: Bool
@@ -24,7 +24,10 @@ struct TimeSummaryPanel: View {
                 Text("How you spent it.")
                     .font(.system(size: compact ? 21 : 25, weight: .regular, design: .serif))
                     .foregroundColor(Palette.ivory).fixedSize(horizontal: false, vertical: true)
-                Text("The time practiced in each step, with each cycle's total and its average per step. Pauses with a step count; the cards and time away don't.")
+                Text("The time practiced in each step, with each cycle's total and its average per step. " +
+                     (engine.configuration.isTimed
+                      ? "Pauses with a step count; the cards and time away don't."
+                      : "Paused time, the cards, and time away don't count."))
                     .font(.system(size: compact ? 11 : 12)).foregroundColor(Palette.muted)
                     .lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             }
@@ -86,6 +89,7 @@ struct TimeSummaryPanel: View {
                 Button("Practice again", action: model.practiceAgain).buttonStyle(GoldButtonStyle())
                     .keyboardShortcut(.return, modifiers: [])
                     .accessibilityIdentifier("practice-again")
+                Button("View history", action: model.showJourney).buttonStyle(QuietButtonStyle())
                 Button("Close", action: model.close).buttonStyle(QuietButtonStyle())
             }
         }
